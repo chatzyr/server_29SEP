@@ -37,7 +37,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     app.use(userRoutes),
     app.get("/fetchData", async (e, o) => {
         try {
-            console.log("fetch data");
+            console.log("fetch dataa");
             const e = await RoomModel.find(),
                 s = await Offer.aggregate([{ $project: { _id: 0, __v: 0 } }]),
                 r = await Mods.aggregate([{ $project: { _id: 0, __v: 0 } }]),
