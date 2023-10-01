@@ -242,12 +242,12 @@ const wss = new WebSocket.Server({ server: server }),
 async function fetchAndSendUpdates(e) {
     try {
         const o = await getfromdb(e);
+        
         (roomDataMap.get(e) || []).forEach((e) => {
             e.readyState === WebSocket.OPEN && e.send(JSON.stringify(o));
         });
-        console.log("DATA SENT BACK TO CLIENT!!!");
     } catch (o) {
-        console.error(Error in background data retrieval for room ${e}:, o);
+        console.error(`Error in background data retrieval for room ${e}:`, o);
     }
 }
 setInterval(() => {
@@ -424,7 +424,8 @@ async function getfromdb(e) {
                 });
         const i = await Mods.aggregate([{ $project: { _id: 0 } }]),
             c = { ...a[0], users: r, activemods: i };
-            console.log("FETCHED DONE FROM DB");
+
+            console.log("FETCHED FORM DB ALL DATA!!!");
         return { mess: s[0], userdetails: n, roomdata: c };
     } catch (e) {
         throw (console.error("Error in getfromdb:", e), e);
@@ -459,7 +460,7 @@ wss.on("connection", (e) => {
                 console.error("Error parsing JSON:", e);
             }
         })
-       
+        
 }),
     app.post("/updatebadge", async (e, o) => {
         const s = await mongoose.startSession();
