@@ -29,7 +29,7 @@ function generateRandomString() {
 }
 mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     mongoose.connection.on("connected", () => {
-        console.log("DB connection successfull");
+        console.log("DB connection successful");
     }),
     mongoose.connection.on("error", (e) => {
         console.log("DB connection failed", e);
@@ -37,7 +37,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     app.use(userRoutes),
     app.get("/fetchData", async (e, o) => {
         try {
-            console.log("fetch dataa");
+            console.log("fetch data");
             const e = await RoomModel.find(),
                 s = await Offer.aggregate([{ $project: { _id: 0, __v: 0 } }]),
                 r = await Mods.aggregate([{ $project: { _id: 0, __v: 0 } }]),
@@ -242,7 +242,6 @@ const wss = new WebSocket.Server({ server: server }),
 async function fetchAndSendUpdates(e) {
     try {
         const o = await getfromdb(e);
-        
         (roomDataMap.get(e) || []).forEach((e) => {
             e.readyState === WebSocket.OPEN && e.send(JSON.stringify(o));
         });
@@ -424,8 +423,6 @@ async function getfromdb(e) {
                 });
         const i = await Mods.aggregate([{ $project: { _id: 0 } }]),
             c = { ...a[0], users: r, activemods: i };
-
-            console.log("FETCHED FORM DB ALL DATA!!!");
         return { mess: s[0], userdetails: n, roomdata: c };
     } catch (e) {
         throw (console.error("Error in getfromdb:", e), e);
@@ -459,8 +456,10 @@ wss.on("connection", (e) => {
             } catch (e) {
                 console.error("Error parsing JSON:", e);
             }
-        })
-        
+        }),
+        e.on("close", () => {
+            connections.delete(e), console.log("WebSocket client disconnected");
+        });
 }),
     app.post("/updatebadge", async (e, o) => {
         const s = await mongoose.startSession();
