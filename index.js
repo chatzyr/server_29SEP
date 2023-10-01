@@ -29,7 +29,7 @@ function generateRandomString() {
 }
 mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     mongoose.connection.on("connected", () => {
-        console.log("DB connection successful");
+        console.log("DB connection successfull");
     }),
     mongoose.connection.on("error", (e) => {
         console.log("DB connection failed", e);
