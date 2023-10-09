@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const offersch = new mongoose.Schema({
   offercontent: { type: String, required: true },
+  bubbles: { type: String, default: "true" } 
  
 });
 
