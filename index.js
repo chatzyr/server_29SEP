@@ -36,14 +36,14 @@ function generateRandomString() {
 mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     mongoose.connection.on("connected", () => {
         console.log("DB connection successful");
-        
+
     }),
     mongoose.connection.on("error", (e) => {
         console.log("DB connection failed", e);
     }),
     app.use(userRoutes),
     app.get("/fetchData", async (e, o) => {
-       
+
         try {
             console.log("fetch data");
             const e = await RoomModel.find(),
@@ -58,7 +58,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
 
 
 
-   
+
 
 
     app.post("/updatebackgroundpic", async (e, o) => {
@@ -69,7 +69,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
                 a = await User.findOneAndUpdate({ email: r }, { backgroundPic: t }, { new: !0 }).session(s);
             await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
             for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
-       
+
         } catch (e) {
             await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
         }
@@ -142,7 +142,7 @@ app.post("/warning-notifications", async (e, o) => {
 }),
     app.post("/notifications", async (req, res) => {
         try {
-            const { sender: s, recipient: r, message: t, type: a, pic: n } = req.body;
+            const { sender: s, recipient: r, message: t, type: a, } = req.body;
 
             if (a === 'friendRequest') {
                 // Check if recipient is already a friend
@@ -153,8 +153,15 @@ app.post("/warning-notifications", async (e, o) => {
                     // The recipient is already a friend, send a response
                     return res.status(200).json({ message: "You are already friends with this user" });
                 } else {
+                    const senderUser = await User.findOne({ email: s });
+                    const notification = new Notification({
+                        sender: s,
+                        recipient: r,
+                        message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+                        type: a,
+                        pic: senderUser.pic // Use sender's picture
+                    });
 
-                    const notification = new Notification({ sender: s, recipient: r, message: t, type: a, pic: n });
                     await notification.save();
                     res.status(201).json({ message: "Notification created" });
                     console.log("Notification created");
@@ -163,8 +170,14 @@ app.post("/warning-notifications", async (e, o) => {
             if (a === 'profileLike') {
                 // Check if recipient is already a friend
                 const recipientUser = await User.findOne({ email: r });
-
-                const notification = new Notification({ sender: s, recipient: r, message: t, type: a, pic: n });
+                const senderUser = await User.findOne({ email: s });
+                const notification = new Notification({
+                    sender: s,
+                    recipient: r,
+                    message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+                    type: a,
+                    pic: senderUser.pic // Use sender's picture
+                });
                 await notification.save();
                 res.status(201).json({ message: "Notification created" });
                 console.log("Notification created");
@@ -311,21 +324,21 @@ app.get("/notifications/:userId", async (e, o) => {
     });
 const wss = new WebSocket.Server({ server: server }),
     roomDataMap = new Map();
-    async function fetchAndSendUpdates(roomId) {
-        try {
-          const roomData = await getfromdb(roomId);
-          const clients = roomDataMap.get(roomId) || [];
-      
-          clients.forEach((client) => {
+async function fetchAndSendUpdates(roomId) {
+    try {
+        const roomData = await getfromdb(roomId);
+        const clients = roomDataMap.get(roomId) || [];
+
+        clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify(roomData));
+                client.send(JSON.stringify(roomData));
             }
-          });
-        } catch (error) {
-          console.error("Error fetching and sending updates:", error);
-        }
-      }
-      
+        });
+    } catch (error) {
+        console.error("Error fetching and sending updates:", error);
+    }
+}
+
 
 const connections = new Set();
 
@@ -425,10 +438,9 @@ async function getfromdb(e) {
         const i = await Mods.aggregate([{ $project: { _id: 0 } }]),
             c = { ...a[0], users: r, activemods: i };
 
-            for (const e of roomDataMap.keys())
-            {
-// console.log("ACTIVE USERS ARE : "+e);
-            }  
+        for (const e of roomDataMap.keys()) {
+            // console.log("ACTIVE USERS ARE : "+e);
+        }
         return { mess: s[0], userdetails: n, roomdata: c };
     } catch (e) {
         throw (console.error("Error in getfromdb:", e), e);
@@ -465,21 +477,58 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
 }
 
 
-
+const activeUsers = new Map(); // Use a Map to store active users and their last active time
+const inactivityTimeout = 2.5 * 60 * 1000; // 2.5 minutes in milliseconds
+setInterval(() => {
+    const currentTime = Date.now();
+    activeUsers.forEach((userData, email) => {
+        if (currentTime - userData.lastActive > inactivityTimeout) {
+            // User has been inactive for more than the specified time
+            // Remove the user from activeUsers and close the connection
+            activeUsers.delete(email);
+            // userData.connection.close();
+        }
+    });
+}, 15000); // Check for inactivity every second
 wss.on("connection", (e) => {
     connections.add(e),
         console.log("WebSocket client connected"),
         e.on("message", async (o) => {
             try {
-                    if(o==''){return null;}
-                    
+                // if(o==''){return null;}
+
                 const s = JSON.parse(o);
+
+
+                if (s.action === 'getNotifications') {
+                    // Handle the 'getNotifications' action here
+                    const { recipientEmail } = s.data;
+                    console.log(recipientEmail);
+                    activeUsers.set(recipientEmail, { connection: e, lastActive: Date.now() });
+
+                    try {
+                        // Fetch notifications from your database (similar to 'getMessages')
+                        const notifications = await Notification.find({
+                            recipient: recipientEmail,
+                            read: false,
+                        }).populate('sender');
+                        // Send the notifications to the client
+                        e.send(JSON.stringify({ notifications }));
+                        const onlineusers = Array.from(activeUsers.keys());
+                        e.send(JSON.stringify({ onlineusers }));
+
+
+
+
+                    } catch (error) {
+                        console.error('Error fetching notifications:', error);
+                    }
+                }
 
                 if (s.messageType === "text") {
                     // Save the chat message to MongoDB using Mongoose
                     try {
-                        const { senderId, recipientId, messageType, message } =
-                            s;
+                        const { senderId, recipientId, messageType, message } = s;
                         console.log(senderId, recipientId);
 
 
@@ -499,6 +548,22 @@ wss.on("connection", (e) => {
                                 client.send(JSON.stringify(newMessage));
                             }
                         });
+
+
+                        const messageCount = await PersonalMessage.countDocuments({ senderId, recepientId: recipientId });
+
+                        // If the count exceeds the limit (e.g., 60), delete the oldest message
+                        const messageLimit = 60;
+                        if (messageCount > messageLimit) {
+                            const oldestMessage = await PersonalMessage.findOne(
+                                { senderId, recepientId: recipientId },
+                                {},
+                                { sort: { timestamp: 1 } } // Find the oldest message
+                            );
+
+                            // Delete the oldest message
+                            await oldestMessage.remove();
+                        }
                     } catch (error) {
                         console.error("Error saving chat message:", error);
                     }
@@ -568,7 +633,7 @@ wss.on("connection", (e) => {
             await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
             for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
 
-        
+
         } catch (e) {
             await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
         }
