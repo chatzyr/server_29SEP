@@ -52,10 +52,10 @@ function getlink(link) {
 
         if (match) {
           const extractedData = match[1];
-          console.log("be wala link "+ extractedData); // This will log "KUpwupYj_tY" to the console
+        //   console.log("be wala link "+ extractedData); // This will log "KUpwupYj_tY" to the console
 return extractedData
         } else {
-          console.log("No match found. of be");
+        //   console.log("No match found. of be");
 
           const matched = link.match(/live\/(.*?)\?/);
           if (matched) {
@@ -115,7 +115,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     app.get("/users/:email/profile", async (e, o) => {
         try {
             const s = e.params.email;
-            console.log(s);
+            // console.log(s);
             const r = await User.findOne({ email: s });
             if (!r) return o.status(404).json({ message: "User not found" });
             o.status(200).json(r);
@@ -244,11 +244,11 @@ app.post("/addfriend", async (e, o) => {
     app.put("/updateposition", async (e, o) => {
         try {
             const { roomId1: s, userId: r, x: t, y: a } = e.body;
-            console.log(s, r, t, a);
+            // console.log(s, r, t, a);
             const n = await RoomModel.findOne({ roomId: s });
             if (!n) return o.status(404).json({ error: "Room not found" });
             const i = n.users.findIndex((e) => e === r);
-            if ((console.log(i), -1 === i)) return o.status(404).json({ error: "User not found in the room" });
+            if (( -1 === i)) return o.status(404).json({ error: "User not found in the room" });
             n.coordinates[i] ? ((n.coordinates[i].x = t), (n.coordinates[i].y = a)) : (n.coordinates[i] = { email: r, x: t, y: a }), await n.save(), o.status(200).json({ message: "User position updated successfully" });
         } catch (e) {
             console.error(e), o.status(500).json({ error: "Internal server error" });
@@ -497,7 +497,7 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
     }
     const userIndex = room.coordinates.findIndex(obj => obj.email === userId);
 
-    console.log("INDEX IS " + userIndex);
+    // console.log("INDEX IS " + userIndex);
     // const userIndex = room.users.indexOf(userId);
 
     if (userIndex === -1) {
@@ -555,7 +555,7 @@ wss.on("connection", (e) => {
                     // Save the chat message to MongoDB using Mongoose
                     try {
                         const { senderId, recipientId, messageType, message } = s;
-                        console.log(senderId, recipientId);
+                        // console.log(senderId, recipientId);
                        
 
                         const newMessage = new PersonalMessage({
@@ -567,7 +567,7 @@ wss.on("connection", (e) => {
                         });
 
                         await newMessage.save();
-                        console.log('message sent!');
+                        // console.log('message sent!');
                         // Broadcast the message to all connected clients
                         wss.clients.forEach((client) => {
                             if (client !== e && client.readyState === WebSocket.OPEN) {
@@ -615,8 +615,8 @@ wss.on("connection", (e) => {
 
                     const { roomId1, userId, x, y } = s
                     try {
-                        console.log("ROOM ID " + roomId1);
-                        console.log("USER ID " + userId);
+                        // console.log("ROOM ID " + roomId1);
+                        // console.log("USER ID " + userId);
 
                         await updateCoordinatesWithRetry(roomId1, userId, x, y);
                     } catch (error) {
@@ -680,12 +680,12 @@ wss.on("connection", (e) => {
         try {
             await s.withTransaction(async () => {
                 const { roomid: r, pic: t, name: a, bio: n, videoUrl: i } = e.body.roombody
-                console.log('video: ',i);
+                // console.log('video: ',i);
                 var mylink=i;
                 if(!i.includes('embed'))
 {
     
-    if(mylink==null || mylink=='' ){
+    if(mylink==null || mylink=='' || mylink.length<=6){
         mylink=''
     }
     else{
@@ -695,7 +695,7 @@ wss.on("connection", (e) => {
         mylink='https://www.youtube.com/embed/'+mylink
     }
 }
-                console.log('egge '+ mylink);
+                // console.log('egge '+ mylink);
 
 
                     c = {};
