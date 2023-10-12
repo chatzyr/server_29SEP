@@ -203,6 +203,26 @@ app.post("/addfriend", async (e, o) => {
         console.error(e), o.status(500).json({ error: "Internal server error" });
     }
 }),
+function getlink(e) {
+    var o = e.indexOf("v=");
+    if (-1 !== o) {
+        o += 2;
+        var s = e.indexOf("&", o);
+        return -1 !== s ? e.substring(o, s) : e.substring(o);
+    }
+    {
+        const o = e.match(/youtu\.be\/(.*?)\?/);
+        if (o) {
+            const e = o[1];
+            return console.log("be wala link " + e), e;
+        }
+        {
+            console.log("No match found. of be");
+            const o = e.match(/live\/(.*?)\?/);
+            return o ? o[1] : null;
+        }
+    }
+}
     app.put("/updateposition", async (e, o) => {
         try {
             const { roomId1: s, userId: r, x: t, y: a } = e.body;
@@ -299,25 +319,26 @@ app.get("/notifications/:userId", async (e, o) => {
     }),
     app.post("/createroom", async (e, o) => {
         const { name: s, pic: r, bio: t, videoUrl: a, usern: n } = e.body.roombody;
-        console.log("HEEE" + s, r, t, a, n), o.send(200);
+        var i = getlink(a);
+        i = null == i || "" == i ? "" : "https://www.youtube.com/embed/" + i;
         try {
             const e = await mongoose.startSession();
             e.startTransaction();
-            const o = { email: n, x: 215, y: 125 },
-                i = generateRandomString(),
-                c = { roomId: i, name: s, coordinates: o, badgeurl: r, videourl: a, bio: t, mods: [n] },
-                d = await RoomModel(c);
-            await d.save({ session: e });
-            const m = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),
-                l = new Message({
-                    room_id: i,
+            const a = { email: n, x: 215, y: 125 },
+                c = generateRandomString(),
+                d = { roomId: c, name: s, coordinates: a, badgeurl: r, videourl: i, bio: t, mods: [n] },
+                m = await RoomModel(d);
+            await m.save({ session: e });
+            const l = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),
+                u = new Message({
+                    room_id: c,
                     messages: [
-                        { user_id: n, content: "xxrp7", time: m },
-                        { user_id: n, content: "xxrp7", time: m },
-                        { user_id: n, content: "xxrp7", time: m },
+                        { user_id: n, content: "xxrp7", time: l },
+                        { user_id: n, content: "xxrp7", time: l },
+                        { user_id: n, content: "xxrp7", time: l },
                     ],
                 });
-            await l.save({ session: e }), console.log("Initialized Room Chat..."), await e.commitTransaction(), e.endSession(), console.log("Room Created Sucessfully!");
+            await u.save({ session: e }), console.log("Initialized Room Chat..."), await e.commitTransaction(), e.endSession(), console.log("Room Created Sucessfully!"), o.json({ stat: 200 });
         } catch (e) {
             console.log("Error Creating Room :  " + e);
         }
@@ -652,10 +673,19 @@ wss.on("connection", (e) => {
         const s = await mongoose.startSession();
         try {
             await s.withTransaction(async () => {
-                const { roomid: r, pic: t, name: a, bio: n, videoUrl: i } = e.body.roombody,
-                    c = {};
-                if ((t && (c.badgeurl = t), a && (c.name = a), n && (c.bio = n), i && (c.videourl = i), !(await RoomModel.findOneAndUpdate({ roomId: r }, { $set: c }, { new: !0, session: s })))) throw new Error("Room not found");
-                o.send("1"), console.log("Updated Room Data");
+                const { roomid: r, pic: t, name: a, bio: n, videoUrl: i } = e.body.roombody;
+                var d = getlink(i);
+                if (
+                    ((d = null == d || "" == d ? "" : "https://www.youtube.com/embed/" + d),
+                    (c = {}),
+                    t && (c.badgeurl = t),
+                    a && (c.name = a),
+                    n && (c.bio = n),
+                    i && (c.videourl = d),
+                    !(await RoomModel.findOneAndUpdate({ roomId: r }, { $set: c }, { new: !0, session: s })))
+                )
+                    throw new Error("Room not found");
+                console.log("Updated Room Data"), o.json({ stat: 200 });
             });
         } catch (e) {
             console.log("Room Update Failed: " + e);
