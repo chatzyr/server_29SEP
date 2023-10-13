@@ -516,16 +516,22 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
     for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
     console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
 }
+const activeUsers = new Map(); // Use a Map to store active users and their last active time
+const inactivityTimeout = 2.5 * 60 * 1000; // 2.5 minutes in milliseconds
+setInterval(() => {
+    const currentTime = Date.now();
+    activeUsers.forEach((userData, email) => {
+        if (currentTime - userData.lastActive > inactivityTimeout) {
+            // User has been inactive for more than the specified time
+            // Remove the user from activeUsers and close the connection
+            activeUsers.delete(email);
+            // userData.connection.close();
+        }
+    });
+}, 15000); // Check for inactivity every second
 
-app.get("/notifications/:userId", async (e, o) => {
-    try {
-        const { userId: s } = e.params,
-            r = await Notification.find({ recipient: s, read: !1 }).populate("sender");
-        o.status(200).json({ notifications: r });
-    } catch (e) {
-        console.error(e), o.status(500).json({ message: "Internal server error" });
-    }
-}),
+
+
 
 wss.on("connection", (e) => {
     connections.add(e),
@@ -538,7 +544,9 @@ wss.on("connection", (e) => {
                 if (s.action === 'getNotifications') {
                     // Handle the 'getNotifications' action here
                     const { recipientEmail } = s.data;
-                    // console.log(recipientEmail);
+                    console.log(recipientEmail);
+                    activeUsers.set(recipientEmail, { connection: e, lastActive: Date.now() });
+
                     try {
                         // Fetch notifications from your database (similar to 'getMessages')
                         const notifications = await Notification.find({
@@ -546,11 +554,17 @@ wss.on("connection", (e) => {
                             read: false,
                         }).populate('sender');
                         // Send the notifications to the client
-                        e.send(JSON.stringify({notifications}));
+                        e.send(JSON.stringify({ notifications }));
+                        const onlineusers = Array.from(activeUsers.keys());
+                        e.send(JSON.stringify({ onlineusers }));
+
+
+
+
                     } catch (error) {
                         console.error('Error fetching notifications:', error);
                     }
-                } 
+                }
                 if (s.messageType === "text") {
                     // Save the chat message to MongoDB using Mongoose
                     try {
@@ -651,6 +665,16 @@ wss.on("connection", (e) => {
             await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
         }
     }),
+    app.get("/notifications/:userId", async (e, o) => {
+        try {
+            const { userId: s } = e.params,
+                r = await Notification.find({ recipient: s, read: !1 }).populate("sender");
+            o.status(200).json({ notifications: r });
+        } catch (e) {
+            console.error(e), o.status(500).json({ message: "Internal server error" });
+        }
+    }),
+
     app.post("/updateprofilepic", async (e, o) => {
         const s = await mongoose.startSession();
         s.startTransaction();
