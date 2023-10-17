@@ -35,8 +35,8 @@ router.post(
   "/register",
   async (req, res) => {
     try {
-      const { username, email, password } = req.body;
-
+      const { username, email, password, bio, pic, backpic } = req.body;
+      // console.log(username, email, password, bio,pic, '\n backpic: ',backpic);
 
       //validation
       if (!username || !email || !password) {
@@ -52,19 +52,18 @@ router.post(
           success: false,
           message: "user already exisits",
         });
+       
       }
       const hashedPassword = await bcrypt.hash(password, 10);
-// var myemail='xp7y9'
-// myemail=myemail+generateRandomString();
-// myemail=myemail+generateRandomString();
-// myemail=myemail+'@gmail.com'
 
       //save new user
       const user = new User({
         username,
         email,
         password: hashedPassword,
-        // friends: {username: 'username', email: myemail}
+        bio,
+        pic,
+        backgroundPic: backpic,
       
       });
       await user.save();
@@ -74,7 +73,7 @@ router.post(
         user,
       });
     } catch (error) {
-      console.log(" FROM HERE "+error);
+      console.log(error);
       return res.status(500).send({
         message: "Error In Register callback",
         success: false,
