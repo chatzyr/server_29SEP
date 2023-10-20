@@ -370,11 +370,11 @@ async function fetchAndSendUpdates(roomId) {
         const clients = roomDataMap.get(roomId) || [];
         var xx=1;
         clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
+            
                 client.send(JSON.stringify(roomData));
                 console.log("SENDING TO CLIENT "+xx);
                 xx++;
-            }   
+            
         });
     } catch (error) {
         console.error("Error fetching and sending updates:", error);
