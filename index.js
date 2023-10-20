@@ -1,4 +1,4 @@
-    const express = require("express"),
+const express = require("express"),
     mongoose = require("mongoose"),
     bodyParser = require("body-parser"),
     moment = require("moment-timezone"),
@@ -7,8 +7,8 @@
     http = require("http"),
     app = express(),
     PORT = process.env.PORT || 3000;
-    app.use(cors({ origin: !0, credentials: !0 })), app.use(bodyParser.json());
-    const { mongoUrl: mongoUrl } = require("./dbConnection"),
+app.use(cors({ origin: !0, credentials: !0 })), app.use(bodyParser.json());
+const { mongoUrl: mongoUrl } = require("./dbConnection"),
     RoomModel = require("./models/roomsdata"),
     Message = require("./models/message"),
     badgeModel = require("./models/badges"),
@@ -37,51 +37,51 @@ function generateRandomString() {
 function getlink(link) {
     var startIndex = link.indexOf("v="); // Find the index of "v="
     if (startIndex !== -1) {
-      startIndex += 2; // Move to the character after "v="
-      var endIndex = link.indexOf("&", startIndex); // Find the index of "&" after "v="
-      if (endIndex !== -1) {
+        startIndex += 2; // Move to the character after "v="
+        var endIndex = link.indexOf("&", startIndex); // Find the index of "&" after "v="
+        if (endIndex !== -1) {
 
-        return link.substring(startIndex, endIndex); // Extract the video ID
-      } else {
-        return link.substring(startIndex); // If "&" is not found, extract until the end
-      }
+            return link.substring(startIndex, endIndex); // Extract the video ID
+        } else {
+            return link.substring(startIndex); // If "&" is not found, extract until the end
+        }
     }
-    else{
+    else {
         const match = link.match(/youtu\.be\/(.*?)\?/);
 
 
         if (match) {
-          const extractedData = match[1];
-        //   console.log("be wala link "+ extractedData); // This will log "KUpwupYj_tY" to the console
-return extractedData
+            const extractedData = match[1];
+            //   console.log("be wala link "+ extractedData); // This will log "KUpwupYj_tY" to the console
+            return extractedData
         } else {
-        //   console.log("No match found. of be");
+            //   console.log("No match found. of be");
 
-          const matched = link.match(/live\/(.*?)\?/);
-          if (matched) {
-            return matched[1];
-          }
-          else{
-          return null;
-          }
+            const matched = link.match(/live\/(.*?)\?/);
+            if (matched) {
+                return matched[1];
+            }
+            else {
+                return null;
+            }
 
         }
 
     }
     return null; // Return null if "v=" is not found in the link
-  }
-  
+}
+
 mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     mongoose.connection.on("connected", () => {
         console.log("DB connection successful");
-        
+
     }),
     mongoose.connection.on("error", (e) => {
         console.log("DB connection failed", e);
     }),
     app.use(userRoutes),
     app.get("/fetchData", async (e, o) => {
-       
+
         try {
             console.log("fetch data");
             const e = await RoomModel.find(),
@@ -96,7 +96,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
 
 
 
-   
+
 
 
     app.post("/updatebackgroundpic", async (e, o) => {
@@ -106,8 +106,8 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
             const { useremail: r, profileurl: t } = e.body.imgdata,
                 a = await User.findOneAndUpdate({ email: r }, { backgroundPic: t }, { new: !0 }).session(s);
             await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
-            for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
-       
+            // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
         } catch (e) {
             await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
         }
@@ -157,7 +157,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
             // Save the updated likedUser
             await likedUser.save();
 
-            for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+            // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
 
             return res.status(200).json({ user: likedUser });
         } catch (error) {
@@ -248,7 +248,7 @@ app.post("/addfriend", async (e, o) => {
             const n = await RoomModel.findOne({ roomId: s });
             if (!n) return o.status(404).json({ error: "Room not found" });
             const i = n.users.findIndex((e) => e === r);
-            if (( -1 === i)) return o.status(404).json({ error: "User not found in the room" });
+            if ((-1 === i)) return o.status(404).json({ error: "User not found in the room" });
             n.coordinates[i] ? ((n.coordinates[i].x = t), (n.coordinates[i].y = a)) : (n.coordinates[i] = { email: r, x: t, y: a }), await n.save(), o.status(200).json({ message: "User position updated successfully" });
         } catch (e) {
             console.error(e), o.status(500).json({ error: "Internal server error" });
@@ -303,18 +303,18 @@ app.post("/addfriend", async (e, o) => {
     });
 
 
-    app.post("/muteuser", async (e, o) => {
-        const { u: s, t: r, romid: t } = e.body.mutedata;
-        try {
-            const e = await mongoose.startSession();
-            e.startTransaction();
-            const o = await RoomModel.findOne({ roomId: t });
-            o && (o.muted.push(s), o.muted.push(r), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("Muted Sucessfully!");
-            for (const e of roomDataMap.keys()) fetchAndSendUpdates(e)
-        } catch (e) {
-            console.log("error muting " + e);
-        }
-    }),
+app.post("/muteuser", async (e, o) => {
+    const { u: s, t: r, romid: t } = e.body.mutedata;
+    try {
+        const e = await mongoose.startSession();
+        e.startTransaction();
+        const o = await RoomModel.findOne({ roomId: t });
+        o && (o.muted.push(s), o.muted.push(r), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("Muted Sucessfully!");
+       fetchAndSendUpdates(t)
+    } catch (e) {
+        console.log("error muting " + e);
+    }
+}),
     app.post("/blockuser", async (e, o) => {
         const { u: s, rx: r } = e.body.blockdata;
         try {
@@ -322,19 +322,19 @@ app.post("/addfriend", async (e, o) => {
             e.startTransaction();
             const o = await RoomModel.findOne({ roomId: r });
             o && (o.blocked.push(s), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("User Blocked Sucessfully!");
-            for (const e of roomDataMap.keys()) fetchAndSendUpdates(e)
+         fetchAndSendUpdates(r)
         } catch (e) {
             console.log("error Blocking user:  " + e);
         }
     }),
     app.post("/createroom", async (e, res) => {
         const { name: s, pic: r, bio: t, videoUrl: a, usern: n } = e.body.roombody;
-        var mylink=getlink(a);
-        if(mylink==null || mylink==''){
-            mylink=''
+        var mylink = getlink(a);
+        if (mylink == null || mylink == '') {
+            mylink = ''
         }
-        else{
-            mylink='https://www.youtube.com/embed/'+mylink
+        else {
+            mylink = 'https://www.youtube.com/embed/' + mylink
         }
 
         // console.log("HEEE" + s, r, t, a, n), o.send(200);
@@ -356,29 +356,31 @@ app.post("/addfriend", async (e, o) => {
                     ],
                 });
             await l.save({ session: e }), console.log("Initialized Room Chat..."), await e.commitTransaction(), e.endSession(), console.log("Room Created Sucessfully!");
-            res.json({stat:200});
+            res.json({ stat: 200 });
         } catch (e) {
             console.log("Error Creating Room :  " + e);
         }
     });
 const wss = new WebSocket.Server({ server: server }),
     roomDataMap = new Map();
-    const clientsMap = new Map();
-    async function fetchAndSendUpdates(roomId) {
-        try {
-          const roomData = await getfromdb(roomId);
-          const clients = roomDataMap.get(roomId) || [];
-      
-          clients.forEach((client) => {
+const clientsMap = new Map();
+async function fetchAndSendUpdates(roomId) {
+    try {
+        const roomData = await getfromdb(roomId);
+        const clients = roomDataMap.get(roomId) || [];
+        var xx=1;
+        clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify(roomData));
-            }
-          });
-        } catch (error) {
-          console.error("Error fetching and sending updates:", error);
-        }
-      }
-      
+                client.send(JSON.stringify(roomData));
+                console.log("SENDING TO CLIENT "+xx);
+                xx++;
+            }   
+        });
+    } catch (error) {
+        console.error("Error fetching and sending updates:", error);
+    }
+}
+
 
 const connections = new Set();
 
@@ -420,7 +422,7 @@ async function addservermessage(e, o) {
             message = new Message({ room_id: r, messages: [] });
             await message.save();
             console.log("Created New Chat...");
-            for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+            fetchAndSendUpdates(r);
         }
 
         if (message) {
@@ -428,7 +430,12 @@ async function addservermessage(e, o) {
             // console.log(s.user_id);
 
             const messageObject = { user_id: s.user_id, content: s.content, time: t };
+            if(s.content=="xxrp7")
+            {
+                fetchAndSendUpdates(r);
+                return null;
 
+            }
             message.messages.push(messageObject);
 
             if (message.messages.length > 60) {
@@ -437,11 +444,11 @@ async function addservermessage(e, o) {
             }
 
             await message.save();
-            for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
-            console.log("UPDATED ROOM MESS To 60");
+            fetchAndSendUpdates(r);
+            console.log("MSG ADDED");
         }
 
-        console.log("Operation completed successfully");
+        // console.log("Operation completed successfully");
     } catch (error) {
         console.error("Error:", error);
     }
@@ -478,10 +485,9 @@ async function getfromdb(e) {
         const i = await Mods.aggregate([{ $project: { _id: 0 } }]),
             c = { ...a[0], users: r, activemods: i };
 
-            for (const e of roomDataMap.keys())
-            {
-// console.log("ACTIVE USERS ARE : "+e);
-            }  
+        // for (const e of roomDataMap.keys()) {
+        //     // console.log("ACTIVE USERS ARE : "+e);
+        // }
         return { mess: s[0], userdetails: n, roomdata: c };
     } catch (e) {
         throw (console.error("Error in getfromdb:", e), e);
@@ -513,7 +519,7 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
     }
 
     await room.save();
-    for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+    fetchAndSendUpdates(roomId);
     console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
 }
 const activeUsers = new Map(); // Use a Map to store active users and their last active time
@@ -534,17 +540,17 @@ setInterval(() => {
 
 
 wss.on("connection", (e) => {
-    connections.add(e),
+        connections.add(e),
         console.log("WebSocket client connected"),
         e.on("message", async (o) => {
             try {
-                     
+
                 const s = JSON.parse(o);
 
                 if (s.action === 'getNotifications') {
                     // Handle the 'getNotifications' action here
                     const { recipientEmail } = s.data;
-                    console.log(recipientEmail);
+                    // console.log(recipientEmail);
                     activeUsers.set(recipientEmail, { connection: e, lastActive: Date.now() });
 
                     try {
@@ -570,7 +576,7 @@ wss.on("connection", (e) => {
                     try {
                         const { senderId, recipientId, messageType, message } = s;
                         // console.log(senderId, recipientId);
-                       
+
 
                         const newMessage = new PersonalMessage({
                             senderId,
@@ -588,21 +594,21 @@ wss.on("connection", (e) => {
                                 client.send(JSON.stringify(newMessage));
                             }
                         });
-                       
 
-                        const messageCount = await PersonalMessage.countDocuments( { senderId, recepientId: recipientId });
+
+                        const messageCount = await PersonalMessage.countDocuments({ senderId, recepientId: recipientId });
 
                         // If the count exceeds the limit (e.g., 60), delete the oldest message
                         const messageLimit = 60;
                         if (messageCount > messageLimit) {
-                          const oldestMessage = await PersonalMessage.findOne(
-                            { senderId, recepientId: recipientId },
-                            {},
-                            { sort: { timestamp: 1 } } // Find the oldest message
-                          );
-                    
-                          // Delete the oldest message
-                          await oldestMessage.remove();
+                            const oldestMessage = await PersonalMessage.findOne(
+                                { senderId, recepientId: recipientId },
+                                {},
+                                { sort: { timestamp: 1 } } // Find the oldest message
+                            );
+
+                            // Delete the oldest message
+                            await oldestMessage.remove();
                         }
                     } catch (error) {
                         console.error("Error saving chat message:", error);
@@ -642,7 +648,8 @@ wss.on("connection", (e) => {
                 else if ("roomId" in s) {
                     const o = s.roomId;
                     roomDataMap.has(o) || roomDataMap.set(o, []), roomDataMap.get(o).push(e), fetchAndSendUpdates(o);
-                } else if ("room_id" in s) {
+                } 
+                else if ("room_id" in s) {
                     addservermessage(s.mymessage, s.room_id);
                 }
             } catch (e) {
@@ -650,6 +657,12 @@ wss.on("connection", (e) => {
             }
         }),
         e.on("close", () => {
+            roomDataMap.forEach((clients, roomId) => {
+                const index = clients.indexOf(e);
+                if (index !== -1) {
+                    clients.splice(index, 1); // Remove the disconnected user from the room
+                }
+            });
             connections.delete(e), console.log("WebSocket client disconnected");
             clientsMap.delete(e)
         });
@@ -682,9 +695,9 @@ wss.on("connection", (e) => {
             const { useremail: r, profileurl: t } = e.body.imgdata,
                 a = await User.findOneAndUpdate({ email: r }, { pic: t }, { new: !0 }).session(s);
             await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
-            for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+            // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
 
-        
+
         } catch (e) {
             await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
         }
@@ -705,24 +718,23 @@ wss.on("connection", (e) => {
             await s.withTransaction(async () => {
                 const { roomid: r, pic: t, name: a, bio: n, videoUrl: i } = e.body.roombody
                 // console.log('video: ',i);
-                var mylink=i;
-                if(!i.includes('embed'))
-{
-    
-    if(mylink==null || mylink=='' || mylink.length<=6){
-        mylink=''
-    }
-    else{
-     
-        mylink=getlink(i);
-    
-        mylink='https://www.youtube.com/embed/'+mylink
-    }
-}
+                var mylink = i;
+                if (!i.includes('embed')) {
+
+                    if (mylink == null || mylink == '' || mylink.length <= 6) {
+                        mylink = ''
+                    }
+                    else {
+
+                        mylink = getlink(i);
+
+                        mylink = 'https://www.youtube.com/embed/' + mylink
+                    }
+                }
                 // console.log('egge '+ mylink);
 
 
-                    c = {};
+                c = {};
                 if ((t && (c.badgeurl = t), a && (c.name = a), n && (c.bio = n), i && (c.videourl = mylink), !(await RoomModel.findOneAndUpdate({ roomId: r }, { $set: c }, { new: !0, session: s })))) throw new Error("Room not found");
 
 
@@ -731,7 +743,7 @@ wss.on("connection", (e) => {
 
 
                 console.log("Updated Room Data");
-                o.json({stat: 200})
+                o.json({ stat: 200 })
             });
         } catch (e) {
             console.log("Room Update Failed: " + e);
