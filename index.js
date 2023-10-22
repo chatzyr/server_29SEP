@@ -158,7 +158,7 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     }),
     app.post("/users/:userId/increment-likes", async (req, res) => {
         const { userId: likedUserId } = req.params;
-        const { user: loggedInUser } = req.body; // Assuming you have the logged-in user information in the request body
+        const { user: loggedInUser } = req.body; // Assumddding you have the logged-in user information in the request body
 
         try {
             // Check if the logged-in user has already liked the profile of the user with likedUserId
