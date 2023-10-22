@@ -490,7 +490,7 @@ async function addservermessage(e, o) {
             await room.save();
             console.log('Coordinates added successfully.');
         } else {
-            console.log('Coordinates already exist.');
+            // console.log('Coordinates already exist.');
         }
 
         let message = await Message.findOne({ room_id: r });
@@ -667,7 +667,7 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
 
     await room.save();
     fetchAndSendUpdates(roomId);
-    console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
+    // console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
 }
 const activeUsers = new Map(); // Use a Map to store active users and their last active time
 const inactivityTimeout = 2.5 * 60 * 1000; // 2.5 minutes in milliseconds
