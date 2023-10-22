@@ -12,6 +12,7 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
     RoomModel = require("./models/roomsdata"),
     Message = require("./models/message"),
     badgeModel = require("./models/badges"),
+    ColorsModel = require("./models/colors"),
     User = require("./models/user"),
     Offer = require("./models/offermodal"),
     Mods = require("./models/mods"),
@@ -25,6 +26,8 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
 
 //---------------------------------------------------------------------------------------------------------//
 
+  
+
 function generateRandomString() {
     let e = "";
     for (let o = 0; o < 7; o++) {
@@ -33,6 +36,7 @@ function generateRandomString() {
     }
     return e;
 }
+
 
 function getlink(link) {
     var startIndex = link.indexOf("v="); // Find the index of "v="
@@ -96,7 +100,25 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
 
 
 
-
+    app.get('/fetchcolors', async (req, res) => {
+        try {
+          // Query the database to fetch all colors
+          const allColors = await ColorsModel.aggregate([
+            {
+              $project: {
+                _id: 0,  // Exclude the _id field
+                __v: 0   // Exclude the __v field
+              }
+            }])
+          
+          // Send the colors in the response
+          res.status(200).json(allColors);
+        } catch (err) {
+          // Handle any errors that occur during the database query
+          res.status(500).json({ error: 'Internal Server Error' });
+        }
+      });
+      
 
 
     app.post("/updatebackgroundpic", async (e, o) => {
@@ -302,7 +324,31 @@ app.post("/addfriend", async (e, o) => {
         }
     });
 
-
+    app.post("/changecolor", async (req, res) => {
+        const { user,hex } = req.body.det;
+        // console.log("COLOR UPDATED "+user+ hex);
+        try {
+            // Find the user by their email and update the color
+            const updatedUser = await User.findOneAndUpdate(
+              { email: user },
+              { chatcolor: hex },
+              { new: true } // This option returns the updated document
+            );
+        
+            if (updatedUser) {
+              // User found and color updated
+              console.log("COLOR UPDATED "+user+ hex);
+              return res.status(200).json({ message: 'Color updated successfully' });
+             
+            } else {
+              // User not found
+              return res.status(404).json({ error: 'User not found' });
+            }
+          } catch (e) {
+            console.error("Error updating color: " + e);
+            return res.status(500).json({ error: 'An error occurred while updating the color' });
+          }
+    }),
 app.post("/muteuser", async (e, o) => {
     const { u: s, t: r, romid: t } = e.body.mutedata;
     try {
@@ -315,18 +361,50 @@ app.post("/muteuser", async (e, o) => {
         console.log("error muting " + e);
     }
 }),
-    app.post("/blockuser", async (e, o) => {
-        const { u: s, rx: r } = e.body.blockdata;
+    // app.post("/blockuser", async (e, o) => {
+    //     const { u: s, rx: r } = e.body.blockdata;
+    //     try {
+    //         const e = await mongoose.startSession();
+    //         e.startTransaction();
+    //         const o = await RoomModel.findOne({ roomId: r });
+    //         o && (o.blocked.push(s), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("User Blocked Sucessfully!");
+    //      fetchAndSendUpdates(r)
+    //     } catch (e) {
+    //         console.log("error Blocking user:  " + e);
+    //     }
+    // }),
+    app.post("/blockuser", async (req, res) => {
+        const { u: userToBlock, rx: roomId } = req.body.blockdata;
+      
         try {
-            const e = await mongoose.startSession();
-            e.startTransaction();
-            const o = await RoomModel.findOne({ roomId: r });
-            o && (o.blocked.push(s), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("User Blocked Sucessfully!");
-         fetchAndSendUpdates(r)
-        } catch (e) {
-            console.log("error Blocking user:  " + e);
+          const session = await mongoose.startSession();
+          session.startTransaction();
+      
+          const room = await RoomModel.findOne({ roomId });
+      
+          if (room) {
+            room.blocked.push(userToBlock);
+            await room.save({ session });
+          }
+      
+          await session.commitTransaction();
+          session.endSession();
+          
+          console.log("User Blocked Successfully!");
+      
+          // Assuming this function sends updates to the relevant parties
+          // Make sure it's called at the appropriate place in your logic
+          fetchAndSendUpdates(roomId);
+      
+          res.status(200).json({ message: "User Blocked Successfully!" });
+        } catch (error) {
+          console.error("Error Blocking User: " + error);
+      
+          // Handle the error, roll back the transaction if necessary
+          res.status(500).json({ error: "An error occurred while blocking the user." });
         }
-    }),
+      });
+      
     app.post("/createroom", async (e, res) => {
         const { name: s, pic: r, bio: t, videoUrl: a, usern: n } = e.body.roombody;
         var mylink = getlink(a);
@@ -454,7 +532,6 @@ async function addservermessage(e, o) {
     }
 }
 
-
 async function getfromdb(e) {
     try {
         const o = e,
@@ -463,36 +540,106 @@ async function getfromdb(e) {
                 { $project: { _id: 0, room_id: 1, messages: { $map: { input: "$messages", as: "message", in: { user_id: "$$message.user_id", content: "$$message.content", time: "$$message.time" } } } } },
             ]);
         let r = [];
-        void 0 !== s[0] && (r = [...new Set(s[0].messages.map((e) => e.user_id))]);
-        const t = await User.aggregate([{ $match: { email: { $in: r } } }, { $project: { _id: 0 } }]),
-            a = await RoomModel.aggregate([{ $match: { roomId: o } }, { $project: { _id: 0 } }]),
-            n = t.reduce((e, o) => {
-                const { username: s, password: r, email: t, badge: a, pic: n, backgroundPic: i, bio: c, likes: d, friends: m, premium: l } = o;
-                return (e[t] = { name: s, email: t, password: r, badge: a, pic: n, backgroundPic: i, bio: c, likes: d, friends: m, preminum: l }), e;
-            }, {});
+        if (s[0]) {
+            r = [...new Set(s[0].messages.map((e) => e.user_id))];
+        }
+        const t = await User.aggregate([
+            { $match: { email: { $in: r } } },
+            {
+                $project: {
+                    _id: 0,
+                    chatcolor: 1, // Include the chatcolor field
+                    username: 1,
+                    password: 1,
+                    email: 1,
+                    badge: 1,
+                    pic: 1,
+                    backgroundPic: 1,
+                    bio: 1,
+                    likes: 1,
+                    friends: 1,
+                    premium: 1,
+                }
+            }
+        ]);
+        const a = await RoomModel.aggregate([
+            { $match: { roomId: o } },
+            { $project: { _id: 0 } }
+        ]);
+        const n = t.reduce((e, o) => {
+            const { chatcolor, username: s, password: r, email: t, badge: a, pic: n, backgroundPic: i, bio: c, likes: d, friends: m, premium: l } = o;
+            return (e[t] = {
+                chatcolor, // Add chatcolor to the object
+                name: s,
+                email: t,
+                password: r,
+                badge: a,
+                pic: n,
+                backgroundPic: i,
+                bio: c,
+                likes: d,
+                friends: m,
+                premium: l
+            }), e;
+        }, {});
         RoomModel.updateMany({}, { $set: { users: r } })
             .then((e) => { })
             .catch((e) => {
                 console.error("Error updating users:", e);
-            }),
-            RoomModel.updateMany({ "coordinates.x": { $exists: !1 }, "coordinates.y": { $exists: !1 } }, { $set: { "coordinates.x": 215, "coordinates.y": 125 } })
-                .then((e) => {
+            });
+        RoomModel.updateMany({ "coordinates.x": { $exists: !1 }, "coordinates.y": { $exists: !1 } }, { $set: { "coordinates.x": 215, "coordinates.y": 125 } })
+            .then((e) => {
 
-                })
-                .catch((e) => {
-                    console.error("Error updating coordinates:", e);
-                });
-        const i = await Mods.aggregate([{ $project: { _id: 0 } }]),
-            c = { ...a[0], users: r, activemods: i };
-
-        // for (const e of roomDataMap.keys()) {
-        //     // console.log("ACTIVE USERS ARE : "+e);
-        // }
+            })
+            .catch((e) => {
+                console.error("Error updating coordinates:", e);
+            });
+        const i = await Mods.aggregate([{ $project: { _id: 0 } }]);
+        const c = { ...a[0], users: r, activemods: i };
         return { mess: s[0], userdetails: n, roomdata: c };
     } catch (e) {
         throw (console.error("Error in getfromdb:", e), e);
     }
 }
+
+// async function getfromdb(e) {
+//     try {
+//         const o = e,
+//             s = await Message.aggregate([
+//                 { $match: { room_id: o } },
+//                 { $project: { _id: 0, room_id: 1, messages: { $map: { input: "$messages", as: "message", in: { user_id: "$$message.user_id", content: "$$message.content", time: "$$message.time" } } } } },
+//             ]);
+//         let r = [];
+//         void 0 !== s[0] && (r = [...new Set(s[0].messages.map((e) => e.user_id))]);
+//         const t = await User.aggregate([{ $match: { email: { $in: r } } }, { $project: { _id: 0 } }]),
+//             a = await RoomModel.aggregate([{ $match: { roomId: o } }, { $project: { _id: 0 } }]),
+//             n = t.reduce((e, o) => {
+//                 const { username: s, password: r, email: t, badge: a, pic: n, backgroundPic: i, bio: c, likes: d, friends: m, premium: l } = o;
+//                 return (e[t] = { name: s, email: t, password: r, badge: a, pic: n, backgroundPic: i, bio: c, likes: d, friends: m, preminum: l }), e;
+//             }, {});
+//         RoomModel.updateMany({}, { $set: { users: r } })
+//             .then((e) => { })
+//             .catch((e) => {
+//                 console.error("Error updating users:", e);
+//             }),
+//             RoomModel.updateMany({ "coordinates.x": { $exists: !1 }, "coordinates.y": { $exists: !1 } }, { $set: { "coordinates.x": 215, "coordinates.y": 125 } })
+//                 .then((e) => {
+
+//                 })
+//                 .catch((e) => {
+//                     console.error("Error updating coordinates:", e);
+//                 });
+//         const i = await Mods.aggregate([{ $project: { _id: 0 } }]),
+//             c = { ...a[0], users: r, activemods: i };
+
+//         // for (const e of roomDataMap.keys()) {
+//         //     // console.log("ACTIVE USERS ARE : "+e);
+//         // }
+//         return { mess: s[0], userdetails: n, roomdata: c };
+//     } catch (e) {
+//         throw (console.error("Error in getfromdb:", e), e);
+//     }
+// }
 
 
 async function updateCoordinatesWithRetry(roomId, userId, x, y) {
