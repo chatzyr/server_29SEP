@@ -523,7 +523,7 @@ async function addservermessage(e, o) {
 
             await message.save();
             fetchAndSendUpdates(r);
-            console.log("MSG ADDED");
+            console.log("MSG ADDED "+ s.content);
         }
 
         // console.log("Operation completed successfully");
