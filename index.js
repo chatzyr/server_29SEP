@@ -82,369 +82,16 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     }),
     mongoose.connection.on("error", (e) => {
         console.log("DB connection failed", e);
-    }),
-    app.use(userRoutes),
-    app.get("/fetchData", async (e, o) => {
+    })
+ 
+   
 
-        try {
-            console.log("fetch data");
-            const e = await RoomModel.find(),
-                s = await Offer.aggregate([{ $project: { _id: 0, __v: 0 } }]),
-                r = await Mods.aggregate([{ $project: { _id: 0, __v: 0 } }]),
-                t = { documents: e, offer: s[0], mymods: r };
-            o.json(t);
-        } catch (e) {
-            console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
-        }
-    }),
-
-
-
-    app.get('/fetchcolors', async (req, res) => {
-        try {
-          // Query the database to fetch all colors
-          const allColors = await ColorsModel.aggregate([
-            {
-              $project: {
-                _id: 0,  // Exclude the _id field
-                __v: 0   // Exclude the __v field
-              }
-            }])
-          
-          // Send the colors in the response
-          res.status(200).json(allColors);
-        } catch (err) {
-          // Handle any errors that occur during the database query
-          res.status(500).json({ error: 'Internal Server Error' });
-        }
-      });
-      
-
-
-    app.post("/updatebackgroundpic", async (e, o) => {
-        const s = await mongoose.startSession();
-        s.startTransaction();
-        try {
-            const { useremail: r, profileurl: t } = e.body.imgdata,
-                a = await User.findOneAndUpdate({ email: r }, { backgroundPic: t }, { new: !0 }).session(s);
-            await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
-            // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
-
-        } catch (e) {
-            await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
-        }
-    }),
-    app.get("/users/:email/profile", async (e, o) => {
-        try {
-            const s = e.params.email;
-            // console.log(s);
-            const r = await User.findOne({ email: s });
-            if (!r) return o.status(404).json({ message: "User not found" });
-            o.status(200).json(r);
-        } catch (e) {
-            console.error(e), o.status(500).json({ message: "Server error" });
-        }
-        app.put("/users/:email/updateprofile", async (e, o) => {
-            try {
-                const s = e.params.email,
-                    { username: r, bio: t } = e.body,
-                    a = await User.findOne({ email: s });
-                if (!a) return o.status(404).json({ message: "User not found" });
-                (a.username = r), (a.bio = t), await a.save(), o.status(200).json({ message: "User updated successfully" });
-            } catch (e) {
-                console.error(e), o.status(500).json({ message: "Server error" });
-            }
-        });
-    }),
-    app.post("/users/:userId/increment-likes", async (req, res) => {
-        const { userId: likedUserId } = req.params;
-        const { user: loggedInUser } = req.body; // Assumddding you have the logged-in user information in the request body
-
-        try {
-            // Check if the logged-in user has already liked the profile of the user with likedUserId
-            const likedUser = await User.findOne({ email: likedUserId });
-            if (!likedUser) {
-                return res.status(404).json({ message: "User not found" });
-            }
-
-            // Check if the logged-in user's ID is in the likedBy array of the likedUser
-            if (likedUser.likedBy.includes(loggedInUser)) {
-                return res.status(400).json({ message: "You have already liked this profile" });
-            }
-
-            // Increment the likes count of the likedUser and add the logged-in user's ID to the likedBy array
-            likedUser.likes += 1;
-            likedUser.likedBy.push(loggedInUser);
-
-            // Save the updated likedUser
-            await likedUser.save();
-
-            // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
-
-            return res.status(200).json({ user: likedUser });
-        } catch (error) {
-            console.error(error);
-            return res.status(500).json({ message: "Internal server error" });
-        }
-    });
-
-app.post("/warning-notifications", async (e, o) => {
-    try {
-        const { sender: s, recipients: r, message: t, type: a, pic: n } = e.body,
-            i = r.map(async (e) => {
-                const o = new Notification({ sender: s, recipient: e, message: t, type: a, pic: n });
-                return await o.save(), o;
-            });
-        await Promise.all(i), o.status(201).json({ message: "Notifications created" }), console.log("Notifications created");
-    } catch (e) {
-        console.error(e), o.status(500).json({ message: "Internal server error" });
-    }
-}),
-    app.post("/notifications", async (req, res) => {
-        try {
-            const { sender: s, recipient: r, message: t, type: a, } = req.body;
-
-            if (a === 'friendRequest') {
-                // Check if recipient is already a friend
-                const recipientUser = await User.findOne({ email: r });
-
-                if (recipientUser && recipientUser.friends.some(friend => friend.email === s)) {
-                    console.log('already a friend');
-                    // The recipient is already a friend, send a response
-                    return res.status(200).json({ message: "You are already friends with this user" });
-                } else {
-                    const senderUser = await User.findOne({ email: s });
-                    const notification = new Notification({
-                        sender: s,
-                        recipient: r,
-                        message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
-                        type: a,
-                        pic: senderUser.pic // Use sender's picture
-                    });
-
-                    await notification.save();
-                    res.status(201).json({ message: "Notification created" });
-                    console.log("Notification created");
-                }
-            }
-            if (a === 'profileLike') {
-                // Check if recipient is already a friend
-                const recipientUser = await User.findOne({ email: r });
-                const senderUser = await User.findOne({ email: s });
-                const notification = new Notification({
-                    sender: s,
-                    recipient: r,
-                    message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
-                    type: a,
-                    pic: senderUser.pic // Use sender's picture
-                });
-                await notification.save();
-                res.status(201).json({ message: "Notification created" });
-                console.log("Notification created");
-            }
-
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: "Internal server error" });
-        }
-    });
-app.post("/addfriend", async (e, o) => {
-    const { username: s, useremail: r, friendUsername: t, friendEmail: a } = e.body;
-    console.log("friend req");
-    try {
-        const e = await User.findOne({ email: r });
-        if (!e) return o.status(404).json({ error: "Sender not found" });
-        const n = await User.findOne({ email: a });
-        if (!n) return o.status(404).json({ error: "Receiver not found" });
-        const i = { username: t, email: a },
-            c = { username: s, email: e.email };
-        e.friends.push(i), n.friends.push(c), await e.save(), await n.save(), o.status(200).json({ message: "Friend added successfully" });
-    } catch (e) {
-        console.error(e), o.status(500).json({ error: "Internal server error" });
-    }
-}),
-    app.put("/updateposition", async (e, o) => {
-        try {
-            const { roomId1: s, userId: r, x: t, y: a } = e.body;
-            // console.log(s, r, t, a);
-            const n = await RoomModel.findOne({ roomId: s });
-            if (!n) return o.status(404).json({ error: "Room not found" });
-            const i = n.users.findIndex((e) => e === r);
-            if ((-1 === i)) return o.status(404).json({ error: "User not found in the room" });
-            n.coordinates[i] ? ((n.coordinates[i].x = t), (n.coordinates[i].y = a)) : (n.coordinates[i] = { email: r, x: t, y: a }), await n.save(), o.status(200).json({ message: "User position updated successfully" });
-        } catch (e) {
-            console.error(e), o.status(500).json({ error: "Internal server error" });
-        }
-    }),
-    app.get("/getusercoordinates", async (e, o) => {
-        try {
-            const { roomId: s, userEmails: r } = e.query;
-            if (!Array.isArray(r)) return o.status(400).json({ error: "Invalid userEmails parameter" });
-            const t = await RoomModel.findOne({ roomId: s });
-            if (!t) return o.status(404).json({ error: "Room not found" });
-            const a = t.coordinates.filter((e) => r.includes(e.email)).map((e) => ({ x: e.x, y: e.y, email: e.email }));
-            if (0 === a.length) return o.status(404).json({ error: "No matching users found in the room" });
-            o.status(200).json(a);
-        } catch (e) {
-            console.error(e), o.status(500).json({ error: "Internal server error" });
-        }
-    }),
-    app.put("/notifications/:notificationId/mark-as-read", async (e, o) => {
-        const { notificationId: s } = e.params;
-        try {
-            const e = await Notification.findByIdAndUpdate(s, { read: !0 }, { new: !0 });
-            if (!e) return o.status(404).json({ error: "Notification not found" });
-            o.status(200).json({ message: "Notification marked as read", notification: e });
-        } catch (e) {
-            console.error("Error marking notification as read:", e), o.status(500).json({ error: "Internal server error" });
-        }
-    }),
-    app.get("/users/:userId/friends", async (req, res) => {
-        try {
-            const userId = req.params.userId;
-
-            // Find the user with the specified userId
-            const user = await User.findOne({ email: userId });
-
-            if (!user) {
-                return res.status(404).json({ message: "User not found" });
-            }
-
-            // Get the list of friend emails
-            const friendEmails = user.friends.map(friend => friend.email);
-
-            // Find the details of each friend using their email addresses
-            const friendDetails = await User.find({ email: { $in: friendEmails } });
-
-            // Return the details of friends to the frontend
-            res.json({ friends: friendDetails });
-        } catch (error) {
-            console.error("Error fetching user friends:", error);
-            res.status(500).json({ message: "Internal server error" });
-        }
-    });
-
-    app.post("/changecolor", async (req, res) => {
-        const { user,hex } = req.body.det;
-        // console.log("COLOR UPDATED "+user+ hex);
-        try {
-            // Find the user by their email and update the color
-            const updatedUser = await User.findOneAndUpdate(
-              { email: user },
-              { chatcolor: hex },
-              { new: true } // This option returns the updated document
-            );
-        
-            if (updatedUser) {
-              // User found and color updated
-              console.log("COLOR UPDATED "+user+ hex);
-              return res.status(200).json({ message: 'Color updated successfully' });
-             
-            } else {
-              // User not found
-              return res.status(404).json({ error: 'User not found' });
-            }
-          } catch (e) {
-            console.error("Error updating color: " + e);
-            return res.status(500).json({ error: 'An error occurred while updating the color' });
-          }
-    }),
-app.post("/muteuser", async (e, o) => {
-    const { u: s, t: r, romid: t } = e.body.mutedata;
-    try {
-        const e = await mongoose.startSession();
-        e.startTransaction();
-        const o = await RoomModel.findOne({ roomId: t });
-        o && (o.muted.push(s), o.muted.push(r), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("Muted Sucessfully!");
-       fetchAndSendUpdates(t)
-    } catch (e) {
-        console.log("error muting " + e);
-    }
-}),
-    // app.post("/blockuser", async (e, o) => {
-    //     const { u: s, rx: r } = e.body.blockdata;
-    //     try {
-    //         const e = await mongoose.startSession();
-    //         e.startTransaction();
-    //         const o = await RoomModel.findOne({ roomId: r });
-    //         o && (o.blocked.push(s), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("User Blocked Sucessfully!");
-    //      fetchAndSendUpdates(r)
-    //     } catch (e) {
-    //         console.log("error Blocking user:  " + e);
-    //     }
-    // }),
-    app.post("/blockuser", async (req, res) => {
-        const { u: userToBlock, rx: roomId } = req.body.blockdata;
-      
-        try {
-          const session = await mongoose.startSession();
-          session.startTransaction();
-      
-          const room = await RoomModel.findOne({ roomId });
-      
-          if (room) {
-            room.blocked.push(userToBlock);
-            await room.save({ session });
-          }
-      
-          await session.commitTransaction();
-          session.endSession();
-          
-          console.log("User Blocked Successfully!");
-      
-          // Assuming this function sends updates to the relevant parties
-          // Make sure it's called at the appropriate place in your logic
-          fetchAndSendUpdates(roomId);
-      
-          res.status(200).json({ message: "User Blocked Successfully!" });
-        } catch (error) {
-          console.error("Error Blocking User: " + error);
-      
-          // Handle the error, roll back the transaction if necessary
-          res.status(500).json({ error: "An error occurred while blocking the user." });
-        }
-      });
-      
-    app.post("/createroom", async (e, res) => {
-        const { name: s, pic: r, bio: t, videoUrl: a, usern: n } = e.body.roombody;
-        var mylink = getlink(a);
-        if (mylink == null || mylink == '') {
-            mylink = ''
-        }
-        else {
-            mylink = 'https://www.youtube.com/embed/' + mylink
-        }
-
-        // console.log("HEEE" + s, r, t, a, n), o.send(200);
-        try {
-            const e = await mongoose.startSession();
-            e.startTransaction();
-            const o = { email: n, x: 215, y: 125 },
-                i = generateRandomString(),
-                c = { roomId: i, name: s, coordinates: o, badgeurl: r, videourl: mylink, bio: t, mods: [n] },
-                d = await RoomModel(c);
-            await d.save({ session: e });
-            const m = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),
-                l = new Message({
-                    room_id: i,
-                    messages: [
-                        { user_id: n, content: "xxrp7", time: m },
-                        { user_id: n, content: "xxrp7", time: m },
-                        { user_id: n, content: "xxrp7", time: m },
-                    ],
-                });
-            await l.save({ session: e }), console.log("Initialized Room Chat..."), await e.commitTransaction(), e.endSession(), console.log("Room Created Sucessfully!");
-            res.json({ stat: 200 });
-        } catch (e) {
-            console.log("Error Creating Room :  " + e);
-        }
-    });
 const wss = new WebSocket.Server({ server: server }),
     roomDataMap = new Map();
 const clientsMap = new Map();
-async function fetchAndSendUpdates(roomId) {
+async function fetchAndSendUpdates(roomId,x) {
     try {
-        const roomData = await getfromdb(roomId);
+        const roomData = await getfromdb(roomId,x);
         const clients = roomDataMap.get(roomId) || [];
         var xx=1;
         clients.forEach((client) => {
@@ -461,8 +108,6 @@ async function fetchAndSendUpdates(roomId) {
 
 
 const connections = new Set();
-
-
 
 
 async function addservermessage(e, o) {
@@ -482,7 +127,7 @@ async function addservermessage(e, o) {
         // Check if the email exists in the room's coordinates
         const emailToCheck = s.user_id; // Assuming s.user_id is the email
         const emailExists = room.coordinates.some(coord => coord.email === emailToCheck);
-
+        var checking=0
         if (!emailExists) {
             console.log('Adding coordinates from function');
             // The email doesn't exist, so add coordinates
@@ -490,14 +135,15 @@ async function addservermessage(e, o) {
             await room.save();
             console.log('Coordinates added successfully.');
         } else {
-            // console.log('Coordinates already exist.');
+            console.log('Coordinates already exist.');
+            checking=1;
         }
 
         let message = await Message.findOne({ room_id: r });
 
         if (!message) {
             console.error("Room not found");
-            message = new Message({ room_id: r, messages: [] });
+            message = new Message({ room_id: r, messages: [{ user_id: s.user_id, content: s.content, time: t }] });
             await message.save();
             console.log("Created New Chat...");
             fetchAndSendUpdates(r);
@@ -522,8 +168,16 @@ async function addservermessage(e, o) {
             }
 
             await message.save();
-            fetchAndSendUpdates(r);
-            console.log("MSG ADDED "+ s.content);
+            if(checking==1)
+            {
+            fetchAndSendUpdates(r,1);
+            
+            }
+            else
+            {
+                fetchAndSendUpdates(r);
+            }
+            console.log("MSG ADDED");
         }
 
         // console.log("Operation completed successfully");
@@ -532,7 +186,25 @@ async function addservermessage(e, o) {
     }
 }
 
-async function getfromdb(e) {
+async function getfromdb(e,x) {
+   
+    
+    if(x==1)
+    {
+        try {
+        const o = e,
+            s = await Message.aggregate([
+                { $match: { room_id: o } },
+                { $project: { _id: 0, room_id: 1, messages: { $map: { input: "$messages", as: "message", in: { user_id: "$$message.user_id", content: "$$message.content", time: "$$message.time" } } } } },
+            ]);
+            // console.log("JUST MESSAGES SENT");
+        return {mess: s[0]}
+        }
+        catch(e)
+        {
+            console.log("CANT FETCH MESSAGES "+ e);
+        }
+    }
     try {
         const o = e,
             s = await Message.aggregate([
@@ -667,7 +339,7 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
 
     await room.save();
     fetchAndSendUpdates(roomId);
-    // console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
+    console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
 }
 const activeUsers = new Map(); // Use a Map to store active users and their last active time
 const inactivityTimeout = 2.5 * 60 * 1000; // 2.5 minutes in milliseconds
@@ -678,13 +350,11 @@ setInterval(() => {
             // User has been inactive for more than the specified time
             // Remove the user from activeUsers and close the connection
             activeUsers.delete(email);
+            console.log("DELETED "+email);
             // userData.connection.close();
         }
     });
 }, 15000); // Check for inactivity every second
-
-
-
 
 wss.on("connection", (e) => {
         connections.add(e),
@@ -693,11 +363,16 @@ wss.on("connection", (e) => {
             try {
 
                 const s = JSON.parse(o);
-
-                if (s.action === 'getNotifications') {
+                if (s.action == 'ping') {
+                    // console.log("PING");
+                    // Received a "ping" message from the client, respond with a "pong"
+                    const t={msg: 'pong'}
+                    e.send(JSON.stringify(t));
+                  }
+                else if (s.action === 'getNotifications') {
                     // Handle the 'getNotifications' action here
                     const { recipientEmail } = s.data;
-                    // console.log(recipientEmail);
+                    // console.log("ALIVE REQ "+ recipientEmail);
                     activeUsers.set(recipientEmail, { connection: e, lastActive: Date.now() });
 
                     try {
@@ -711,14 +386,11 @@ wss.on("connection", (e) => {
                         const onlineusers = Array.from(activeUsers.keys());
                         e.send(JSON.stringify({ onlineusers }));
 
-
-
-
                     } catch (error) {
                         console.error('Error fetching notifications:', error);
                     }
                 }
-                if (s.messageType === "text") {
+                else if (s.messageType === "text") {
                     // Save the chat message to MongoDB using Mongoose
                     try {
                         const { senderId, recipientId, messageType, message } = s;
@@ -762,7 +434,7 @@ wss.on("connection", (e) => {
                     }
                 }
 
-                if (s.action === "getMessages") {
+                else if (s.action === "getMessages") {
                     const { senderEmail, recipientEmail } = s.data;
 
                     const messages = await PersonalMessage.find({
@@ -778,7 +450,7 @@ wss.on("connection", (e) => {
                     // console.log('');
                 }
 
-                if ("x" in s) {
+                else if ("x" in s) {
 
                     const { roomId1, userId, x, y } = s
                     try {
@@ -814,99 +486,513 @@ wss.on("connection", (e) => {
             clientsMap.delete(e)
         });
 }),
-    app.post("/updatebadge", async (e, o) => {
-        const s = await mongoose.startSession();
-        s.startTransaction();
+
+
+
+app.use(userRoutes),
+app.get("/fetchver", async (e, o) => {
+
+    try {
+
+        t = { version: '1.0.5', link: 'https://www.google.com'};
+        o.json(t);
+    } catch (e) {
+        console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
+    }
+}),
+app.get("/fetchData", async (e, o) => {
+
+    try {
+        // console.log("fetch data");
+        const e = await RoomModel.find(),
+            s = await Offer.aggregate([{ $project: { _id: 0, __v: 0 } }]),
+            r = await Mods.aggregate([{ $project: { _id: 0, __v: 0 } }]),
+            t = { documents: e, offer: s[0], mymods: r };
+        o.json(t);
+    } catch (e) {
+        console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
+    }
+}),
+app.post('/fetchcolors', async (req, res) => {
+    const {userid}=req.body.a
+    console.log("AA "+userid);
+    try {
+        const t = await User.find({ email: userid }, { _id: 0,chatcolor: 1, premium: 1 });
+
+
+               
+      // Query the database to fetch all colorss
+      const allColors = await ColorsModel.aggregate([
+        {
+          $project: {
+            _id: 0,  // Exclude the _id field
+            __v: 0   // Exclude the __v field
+          }
+        }])
+      
+     const rex={allcolors: allColors, premium: t[0]}
+      res.status(200).json(rex);
+    } catch (err) {
+        console.log(err);
+      // Handle any errors that occur during the database query
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+app.post("/updatebackgroundpic", async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+        const { useremail: r, profileurl: t } = e.body.imgdata,
+            a = await User.findOneAndUpdate({ email: r }, { backgroundPic: t }, { new: !0 }).session(s);
+        await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
+        // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
+    } catch (e) {
+        await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+    }
+}),
+app.get("/users/:email/profile", async (e, o) => {
+    try {
+        const s = e.params.email;
+        // console.log(s);
+        const r = await User.findOne({ email: s });
+        if (!r) return o.status(404).json({ message: "User not found" });
+        o.status(200).json(r);
+    } catch (e) {
+        console.error(e), o.status(500).json({ message: "Server error" });
+    }
+    app.put("/users/:email/updateprofile", async (e, o) => {
         try {
-            const { email: r, badgeUrl: t } = e.body.badgedata,
-                a = await User.findOneAndUpdate({ email: r }, { badge: t }, { new: !0 }).session(s);
-            await s.commitTransaction(), s.endSession(), o.json({ message: "Badge updated successfully", user: a });
+            const s = e.params.email,
+                { username: r, bio: t } = e.body,
+                a = await User.findOne({ email: s });
+            if (!a) return o.status(404).json({ message: "User not found" });
+            (a.username = r), (a.bio = t), await a.save(), o.status(200).json({ message: "User updated successfully" });
         } catch (e) {
-            await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+            console.error(e), o.status(500).json({ message: "Server error" });
         }
-    }),
-    app.get("/notifications/:userId", async (e, o) => {
-        try {
-            const { userId: s } = e.params,
-                r = await Notification.find({ recipient: s, read: !1 }).populate("sender");
-            o.status(200).json({ notifications: r });
-        } catch (e) {
-            console.error(e), o.status(500).json({ message: "Internal server error" });
+    });
+}),
+app.post("/users/:userId/increment-likes", async (req, res) => {
+    const { userId: likedUserId } = req.params;
+    const { user: loggedInUser } = req.body; // Assuming you have the logged-in user information in the request body
+
+    try {
+        // Check if the logged-in user has already liked the profile of the user with likedUserId
+        const likedUser = await User.findOne({ email: likedUserId });
+        if (!likedUser) {
+            return res.status(404).json({ message: "User not found" });
         }
-    }),
 
-    app.post("/updateprofilepic", async (e, o) => {
-        const s = await mongoose.startSession();
-        s.startTransaction();
-        try {
-            const { useremail: r, profileurl: t } = e.body.imgdata,
-                a = await User.findOneAndUpdate({ email: r }, { pic: t }, { new: !0 }).session(s);
-            await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
-            // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
-
-
-        } catch (e) {
-            await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+        // Check if the logged-in user's ID is in the likedBy array of the likedUser
+        if (likedUser.likedBy.includes(loggedInUser)) {
+            return res.status(400).json({ message: "You have already liked this profile" });
         }
-    }),
-    app.post("/loadbages", async (e, o) => {
-        const s = await mongoose.startSession();
-        s.startTransaction();
-        try {
-            const e = await badgeModel.aggregate([{ $match: { badgeid: "123" } }, { $project: { _id: 0 } }]).session(s);
-            await s.commitTransaction(), s.endSession(), o.json(e[0]), console.log("BADGES SENT");
-        } catch (e) {
-            await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+
+        // Increment the likes count of the likedUser and add the logged-in user's ID to the likedBy array
+        likedUser.likes += 1;
+        likedUser.likedBy.push(loggedInUser);
+
+        // Save the updated likedUser
+        await likedUser.save();
+
+        // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
+        return res.status(200).json({ user: likedUser });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+app.post("/warning-notifications", async (e, o) => {
+try {
+    const { sender: s, recipients: r, message: t, type: a, pic: n } = e.body,
+        i = r.map(async (e) => {
+            const o = new Notification({ sender: s, recipient: e, message: t, type: a, pic: n });
+            return await o.save(), o;
+        });
+    await Promise.all(i), o.status(201).json({ message: "Notifications created" }), console.log("Notifications created");
+} catch (e) {
+    console.error(e), o.status(500).json({ message: "Internal server error" });
+}
+}),
+app.post("/notifications", async (req, res) => {
+    try {
+        const { sender: s, recipient: r, message: t, type: a, } = req.body;
+
+        if (a === 'friendRequest') {
+            // Check if recipient is already a friend
+            const recipientUser = await User.findOne({ email: r });
+
+            if (recipientUser && recipientUser.friends.some(friend => friend.email === s)) {
+                console.log('already a friend');
+                // The recipient is already a friend, send a response
+                return res.status(200).json({ message: "You are already friends with this user" });
+            } else {
+                const senderUser = await User.findOne({ email: s });
+                const notification = new Notification({
+                    sender: s,
+                    recipient: r,
+                    message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+                    type: a,
+                    pic: senderUser.pic // Use sender's picture
+                });
+
+                await notification.save();
+                res.status(201).json({ message: "Notification created" });
+                console.log("Notification created");
+            }
         }
-    }),
-    app.post("/updateroom", async (e, o) => {
-        const s = await mongoose.startSession();
-        try {
-            await s.withTransaction(async () => {
-                const { roomid: r, pic: t, name: a, bio: n, videoUrl: i } = e.body.roombody
-                // console.log('video: ',i);
-                var mylink = i;
-                if (!i.includes('embed')) {
-
-                    if (mylink == null || mylink == '' || mylink.length <= 6) {
-                        mylink = ''
-                    }
-                    else {
-
-                        mylink = getlink(i);
-
-                        mylink = 'https://www.youtube.com/embed/' + mylink
-                    }
-                }
-                // console.log('egge '+ mylink);
-
-
-                c = {};
-                if ((t && (c.badgeurl = t), a && (c.name = a), n && (c.bio = n), i && (c.videourl = mylink), !(await RoomModel.findOneAndUpdate({ roomId: r }, { $set: c }, { new: !0, session: s })))) throw new Error("Room not found");
-
-
-
-
-
-
-                console.log("Updated Room Data");
-                o.json({ stat: 200 })
+        if (a === 'profileLike') {
+            // Check if recipient is already a friend
+            const recipientUser = await User.findOne({ email: r });
+            const senderUser = await User.findOne({ email: s });
+            const notification = new Notification({
+                sender: s,
+                recipient: r,
+                message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+                type: a,
+                pic: senderUser.pic // Use sender's picture
             });
-        } catch (e) {
-            console.log("Room Update Failed: " + e);
-        } finally {
-            s.endSession();
+            await notification.save();
+            res.status(201).json({ message: "Notification created" });
+            console.log("Notification created");
         }
-    }),
-    app.post("/deleteroom", async (e, o) => {
-        const { roomid: s } = e.body;
-        try {
-            if (!(await RoomModel.findOneAndDelete({ roomId: s }))) return o.status(404).json({ error: "Room not found" });
-            console.log("Delete Room Success"), o.json({ s: 200 });
-        } catch (e) {
-            console.log("Room Deletion Failed: " + e), o.status(500).json({ error: "Room Deletion Failed" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+app.post("/addfriend", async (e, o) => {
+const { username: s, useremail: r, friendUsername: t, friendEmail: a } = e.body;
+console.log("friend req");
+try {
+    const e = await User.findOne({ email: r });
+    if (!e) return o.status(404).json({ error: "Sender not found" });
+    const n = await User.findOne({ email: a });
+    if (!n) return o.status(404).json({ error: "Receiver not found" });
+    const i = { username: t, email: a },
+        c = { username: s, email: e.email };
+    e.friends.push(i), n.friends.push(c), await e.save(), await n.save(), o.status(200).json({ message: "Friend added successfully" });
+} catch (e) {
+    console.error(e), o.status(500).json({ error: "Internal server error" });
+}
+}),
+app.put("/updateposition", async (e, o) => {
+    try {
+        const { roomId1: s, userId: r, x: t, y: a } = e.body;
+        // console.log(s, r, t, a);
+        const n = await RoomModel.findOne({ roomId: s });
+        if (!n) return o.status(404).json({ error: "Room not found" });
+        const i = n.users.findIndex((e) => e === r);
+        if ((-1 === i)) return o.status(404).json({ error: "User not found in the room" });
+        n.coordinates[i] ? ((n.coordinates[i].x = t), (n.coordinates[i].y = a)) : (n.coordinates[i] = { email: r, x: t, y: a }), await n.save(), o.status(200).json({ message: "User position updated successfully" });
+    } catch (e) {
+        console.error(e), o.status(500).json({ error: "Internal server error" });
+    }
+}),
+app.get("/getusercoordinates", async (e, o) => {
+    try {
+        const { roomId: s, userEmails: r } = e.query;
+        if (!Array.isArray(r)) return o.status(400).json({ error: "Invalid userEmails parameter" });
+        const t = await RoomModel.findOne({ roomId: s });
+        if (!t) return o.status(404).json({ error: "Room not found" });
+        const a = t.coordinates.filter((e) => r.includes(e.email)).map((e) => ({ x: e.x, y: e.y, email: e.email }));
+        if (0 === a.length) return o.status(404).json({ error: "No matching users found in the room" });
+        o.status(200).json(a);
+    } catch (e) {
+        console.error(e), o.status(500).json({ error: "Internal server error" });
+    }
+}),
+app.put("/notifications/:notificationId/mark-as-read", async (e, o) => {
+    const { notificationId: s } = e.params;
+    try {
+        const e = await Notification.findByIdAndUpdate(s, { read: !0 }, { new: !0 });
+        if (!e) return o.status(404).json({ error: "Notification not found" });
+        o.status(200).json({ message: "Notification marked as read", notification: e });
+    } catch (e) {
+        console.error("Error marking notification as read:", e), o.status(500).json({ error: "Internal server error" });
+    }
+}),
+app.get("/users/:userId/friends", async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        // Find the user with the specified userId
+        const user = await User.findOne({ email: userId });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
         }
-    }),
+
+        // Get the list of friend emails
+        const friendEmails = user.friends.map(friend => friend.email);
+
+        // Find the details of each friend using their email addresses
+        const friendDetails = await User.find({ email: { $in: friendEmails } });
+
+        // Return the details of friends to the frontend
+        res.json({ friends: friendDetails });
+    } catch (error) {
+        console.error("Error fetching user friends:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+app.post("/changecolor", async (req, res) => {
+    const { user,hex } = req.body.det;
+    // console.log("COLOR UPDATED "+user+ hex);
+    try {
+        // Find the user by their email and update the color
+        const updatedUser = await User.findOneAndUpdate(
+          { email: user },
+          { chatcolor: hex },
+          { new: true } // This option returns the updated document
+        );
+    
+        if (updatedUser) {
+          // User found and color updated
+          console.log("COLOR UPDATED "+user+ hex);
+          return res.status(200).json({ message: 'Color updated successfully' });
+         
+        } else {
+          // User not found
+          return res.status(404).json({ error: 'User not found' });
+        }
+      } catch (e) {
+        console.error("Error updating color: " + e);
+        return res.status(500).json({ error: 'An error occurred while updating the color' });
+      }
+}),
+app.post("/muteuser", async (e, o) => {
+const { u: s, t: r, romid: t } = e.body.mutedata;
+try {
+    const e = await mongoose.startSession();
+    e.startTransaction();
+    const o = await RoomModel.findOne({ roomId: t });
+    o && (o.muted.push(s), o.muted.push(r), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("Muted Sucessfully!");
+   fetchAndSendUpdates(t)
+} catch (e) {
+    console.log("error muting " + e);
+}
+}),
+// app.post("/blockuser", async (e, o) => {
+//     const { u: s, rx: r } = e.body.blockdata;
+//     try {
+//         const e = await mongoose.startSession();
+//         e.startTransaction();
+//         const o = await RoomModel.findOne({ roomId: r });
+//         o && (o.blocked.push(s), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("User Blocked Sucessfully!");
+//      fetchAndSendUpdates(r)
+//     } catch (e) {
+//         console.log("error Blocking user:  " + e);
+//     }
+// }),
+app.post("/blockuser", async (req, res) => {
+    const { u: userToBlock, rx: roomId } = req.body.blockdata;
+  
+    try {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+  
+      const room = await RoomModel.findOne({ roomId });
+  
+      if (room) {
+        room.blocked.push(userToBlock);
+        await room.save({ session });
+      }
+  
+      await session.commitTransaction();
+      session.endSession();
+      
+      console.log("User Blocked Successfully!");
+  
+      // Assuming this function sends updates to the relevant parties
+      // Make sure it's called at the appropriate place in your logic
+      fetchAndSendUpdates(roomId);
+  
+      res.status(200).json({ message: "User Blocked Successfully!" });
+    } catch (error) {
+      console.error("Error Blocking User: " + error);
+  
+      // Handle the error, roll back the transaction if necessary
+      res.status(500).json({ error: "An error occurred while blocking the user." });
+    }
+  });
+  
+app.post("/createroom", async (e, res) => {
+    const { name: s, pic: r, bio: t, videoUrl: a, usern: n } = e.body.roombody;
+    var mylink = getlink(a);
+    if (mylink == null || mylink == '') {
+        mylink = ''
+    }
+    else {
+        mylink = 'https://www.youtube.com/embed/' + mylink
+    }
+
+    // console.log("HEEE" + s, r, t, a, n), o.send(200);
+    try {
+        const e = await mongoose.startSession();
+        e.startTransaction();
+        const o = { email: n, x: 215, y: 125 },
+            i = generateRandomString(),
+            c = { roomId: i, name: s, coordinates: o, badgeurl: r, videourl: mylink, bio: t, mods: [n] },
+            d = await RoomModel(c);
+        await d.save({ session: e });
+        const m = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),
+            l = new Message({
+                room_id: i,
+                messages: [
+                    { user_id: n, content: "xxrp7", time: m },
+                    { user_id: n, content: "xxrp7", time: m },
+                    { user_id: n, content: "xxrp7", time: m },
+                ],
+            });
+        await l.save({ session: e }), console.log("Initialized Room Chat..."), await e.commitTransaction(), e.endSession(), console.log("Room Created Sucessfully!");
+        res.json({ stat: 200 });
+    } catch (e) {
+        console.log("Error Creating Room :  " + e);
+    }
+}),
+app.post("/updatebadge", async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+        const { email: r, badgeUrl: t } = e.body.badgedata,
+            a = await User.findOneAndUpdate({ email: r }, { badge: t }, { new: !0 }).session(s);
+        await s.commitTransaction(), s.endSession(), o.json({ message: "Badge updated successfully", user: a });
+    } catch (e) {
+        await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+    }
+}),
+app.get("/notifications/:userId", async (e, o) => {
+    try {
+        const { userId: s } = e.params,
+            r = await Notification.find({ recipient: s, read: !1 }).populate("sender");
+        o.status(200).json({ notifications: r });
+    } catch (e) {
+        console.error(e), o.status(500).json({ message: "Internal server error" });
+    }
+}),
+
+app.post("/updateprofilepic", async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+        const { useremail: r, profileurl: t } = e.body.imgdata,
+            a = await User.findOneAndUpdate({ email: r }, { pic: t }, { new: !0 }).session(s);
+        await s.commitTransaction(), s.endSession(), o.json({ message: "Profile Pic updated successfully", user: a });
+        // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
+
+    } catch (e) {
+        await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+    }
+}),
+app.post("/loadbages", async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+        const e = await badgeModel.aggregate([{ $match: { badgeid: "123" } }, { $project: { _id: 0 } }]).session(s);
+        await s.commitTransaction(), s.endSession(), o.json(e[0]), console.log("BADGES SENT");
+    } catch (e) {
+        await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+    }
+}),
+app.post("/updateroom", async (e, o) => {
+    const s = await mongoose.startSession();
+    try {
+        await s.withTransaction(async () => {
+            const { roomid: r, pic: t, name: a, bio: n, videoUrl: i } = e.body.roombody
+            // console.log('video: ',i);
+            var mylink = i;
+            if (!i.includes('embed')) {
+
+                if (mylink == null || mylink == '' || mylink.length <= 6) {
+                    mylink = ''
+                }
+                else {
+
+                    mylink = getlink(i);
+
+                    mylink = 'https://www.youtube.com/embed/' + mylink
+                }
+            }
+            // console.log('egge '+ mylink);
+
+
+            c = {};
+            if ((t && (c.badgeurl = t), a && (c.name = a), n && (c.bio = n), i && (c.videourl = mylink), !(await RoomModel.findOneAndUpdate({ roomId: r }, { $set: c }, { new: !0, session: s })))) throw new Error("Room not found");
+
+
+
+
+
+
+            console.log("Updated Room Data");
+            o.json({ stat: 200 })
+        });
+    } catch (e) {
+        console.log("Room Update Failed: " + e);
+    } finally {
+        s.endSession();
+    }
+}),
+app.post("/deleteroom", async (e, o) => {
+    const { roomid: s } = e.body;
+    try {
+        if (!(await RoomModel.findOneAndDelete({ roomId: s }))) return o.status(404).json({ error: "Room not found" });
+        console.log("Delete Room Success"), o.json({ s: 200 });
+    } catch (e) {
+        console.log("Room Deletion Failed: " + e), o.status(500).json({ error: "Room Deletion Failed" });
+    }
+})
+app.post("/removeprofilepic", async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+        const { user } = e.body.a,
+            a = await User.findOneAndUpdate({ email: user }, { pic: "https://cdn-icons-png.flaticon.com/512/3177/3177440.png" }, { new: !0 }).session(s);
+        await s.commitTransaction(), s.endSession(),console.log("PROFILE REMOVED"), o.sendStatus(200);
+        // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
+
+    } catch (e) {
+        await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+    }
+}),
+app.post("/removebackpic", async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+        const { user } = e.body.a,
+            a = await User.findOneAndUpdate({ email: user }, { backgroundPic: "https://as2.ftcdn.net/v2/jpg/01/68/74/87/1000_F_168748763_Mdv7zO7dxuECMzItERhPzWhVJSaORTKd.jpg" }, { new: !0 }).session(s);
+        await s.commitTransaction(), s.endSession(),console.log("BACKGROUND REMOVED"), o.sendStatus(200);
+        // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
+
+    } catch (e) {
+        await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+    }
+}),
+app.post("/removebio", async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+        const { user } = e.body.a,
+            a = await User.findOneAndUpdate({ email: user }, { bio: "Hi i am ChatZyr User!" }, { new: !0 }).session(s);
+        await s.commitTransaction(), s.endSession(),console.log("Bio REMOVED"), o.sendStatus(200);
+        // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
+
+    } catch (e) {
+        await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
+    }
+}),
+
+
     server.listen(PORT, () => {
         console.log("Sockets Server listening on port " + PORT);
     });
