@@ -1,5 +1,4 @@
-const { Mutex } = require('async-mutex');
-const roomMutex = new Mutex();
+
 const express = require("express"),
     mongoose = require("mongoose"),
     bodyParser = require("body-parser"),
@@ -88,8 +87,8 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
 
 
 
-const wss = new WebSocket.Server({ server: server }),
-    roomDataMap = new Map();
+const wss = new WebSocket.Server({ server: server })
+const  roomDataMap = new Map();
 const clientsMap = new Map();
 async function fetchAndSendUpdates(roomId, x) {
     try {
@@ -480,13 +479,13 @@ wss.on("connection", (e) => {
                 else if ("roomId" in s) {
                     const roomId = s.roomId;
                     
-                    roomMutex.runExclusive(async () => {
+                   
                         if (!roomDataMap.has(roomId)) {
                             roomDataMap.set(roomId, []);
                         }
                         roomDataMap.get(roomId).push(e);
-                        await fetchAndSendUpdates(roomId)
-                    });
+                       fetchAndSendUpdates(roomId)
+               
                 }
                 else if ("room_id" in s) {
                     addservermessage(s.mymessage, s.room_id);
