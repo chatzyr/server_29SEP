@@ -96,7 +96,7 @@ async function fetchAndSendUpdates(roomId, x) {
         const roomData = await getfromdb(roomId, x);
         
         const clients = roomDataMap.get(roomId) || [];
-       
+        console.log("SENDING FOR ROOM "+roomId);
 
         var xx = 1;
         clients.forEach((client) => {
@@ -482,11 +482,13 @@ wss.on("connection", (e) => {
                     const roomId = s.roomId;
                     
                     roomMutex.runExclusive(async () => {
+                        
                         if (!roomDataMap.has(roomId)) {
                             console.log("ROOM NF "+roomId);
                             roomDataMap.set(roomId, []);
                             roomids.push(roomId)
                         }
+                        
                         console.log("ADDED To "+roomId);
                         roomDataMap.get(roomId).push(e);
 
