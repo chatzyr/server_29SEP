@@ -92,10 +92,7 @@ const clientsMap = new Map();
 async function fetchAndSendUpdates(roomId, x) {
     try {
         const roomData = await getfromdb(roomId, x);
-        roomDataMap.forEach((roomData, roomId) => {
-            console.log(`Room ID: ${roomId}`);
-            console.log(JSON.stringify(roomData, null, 2));
-          });
+        
         const clients = roomDataMap.get(roomId) || [];
        
 
