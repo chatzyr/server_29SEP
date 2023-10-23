@@ -481,6 +481,7 @@ wss.on("connection", (e) => {
                     
                    
                         if (!roomDataMap.has(roomId)) {
+                            console.log("NO ROOMDTA "+ roomId);
                             roomDataMap.set(roomId, []);
                         }
                         roomDataMap.get(roomId).push(e);
