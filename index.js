@@ -483,10 +483,13 @@ wss.on("connection", (e) => {
                     
                     roomMutex.runExclusive(async () => {
                         if (!roomDataMap.has(roomId)) {
+                            console.log("ROOM NF "+roomId);
                             roomDataMap.set(roomId, []);
                             roomids.push(roomId)
                         }
+                        console.log("ADDED To "+roomId);
                         roomDataMap.get(roomId).push(e);
+
                         roomids.push(roomId)
                        
                     }).then(()=>{
