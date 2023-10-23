@@ -1,3 +1,5 @@
+const { Mutex } = require('async-mutex');
+const roomMutex = new Mutex();
 const express = require("express"),
     mongoose = require("mongoose"),
     bodyParser = require("body-parser"),
@@ -466,13 +468,25 @@ wss.on("connection", (e) => {
                 //     const o = s.roomId;
                 //     roomDataMap.has(o) || roomDataMap.set(o, []), roomDataMap.get(o).push(e), ;
                 // }
+
+                // else if ("roomId" in s) {
+                //     const roomId = s.roomId;
+                //     if (!roomDataMap.has(roomId)) {
+                //         roomDataMap.set(roomId, []);
+                //     }
+                //     roomDataMap.get(roomId).push(e);
+                   
+                // }
                 else if ("roomId" in s) {
                     const roomId = s.roomId;
-                    if (!roomDataMap.has(roomId)) {
-                        roomDataMap.set(roomId, []);
-                    }
-                    roomDataMap.get(roomId).push(e);
-                    fetchAndSendUpdates(roomId)
+                    
+                    roomMutex.runExclusive(async () => {
+                        if (!roomDataMap.has(roomId)) {
+                            roomDataMap.set(roomId, []);
+                        }
+                        roomDataMap.get(roomId).push(e);
+                        fetchAndSendUpdates(roomId)
+                    });
                 }
                 else if ("room_id" in s) {
                     addservermessage(s.mymessage, s.room_id);
