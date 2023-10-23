@@ -485,7 +485,7 @@ wss.on("connection", (e) => {
                             roomDataMap.set(roomId, []);
                         }
                         roomDataMap.get(roomId).push(e);
-                        fetchAndSendUpdates(roomId)
+                        await fetchAndSendUpdates(roomId)
                     });
                 }
                 else if ("room_id" in s) {
