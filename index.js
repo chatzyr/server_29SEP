@@ -1,4 +1,5 @@
-
+const { Mutex } = require('async-mutex');
+const roomMutex = new Mutex();
 const express = require("express"),
     mongoose = require("mongoose"),
     bodyParser = require("body-parser"),
@@ -87,8 +88,8 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
 
 
 
-const wss = new WebSocket.Server({ server: server })
-const  roomDataMap = new Map();
+const wss = new WebSocket.Server({ server: server }),
+    roomDataMap = new Map();
 const clientsMap = new Map();
 async function fetchAndSendUpdates(roomId, x) {
     try {
@@ -312,7 +313,7 @@ async function getfromdb(e, x) {
 //     }
 // }
 
-
+var roomids=[]
 async function updateCoordinatesWithRetry(roomId, userId, x, y) {
     const room = await RoomModel.findOne({ roomId });
 
@@ -477,16 +478,29 @@ wss.on("connection", (e) => {
                    
                 // }
                 else if ("roomId" in s) {
+
                     const roomId = s.roomId;
                     
-                   
+                    roomMutex.runExclusive(async () => {
                         if (!roomDataMap.has(roomId)) {
-                            console.log("NO ROOMDTA "+ roomId);
                             roomDataMap.set(roomId, []);
+                            roomids.push(roomId)
                         }
                         roomDataMap.get(roomId).push(e);
-                       fetchAndSendUpdates(roomId)
-               
+                        roomids.push(roomId)
+                       
+                    }).then(()=>{
+                        const uniqueRoomIds = new Set(roomids);
+                        const idx = Array.from(uniqueRoomIds);
+                        roomids.length = 0;
+                        roomids=[]
+                        
+                        idx.forEach((roome) => {
+                            fetchAndSendUpdates(roome);
+                          });
+                          console.log("SENT UPDATES!!");
+                    }
+                    );
                 }
                 else if ("room_id" in s) {
                     addservermessage(s.mymessage, s.room_id);
