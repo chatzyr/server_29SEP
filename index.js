@@ -96,8 +96,8 @@ async function fetchAndSendUpdates(roomId, x) {
         const roomData = await getfromdb(roomId, x);
         
         const clients = roomDataMap.get(roomId) || [];
-        console.log("SENDING FOR ROOM "+roomId);
-        console.log(JSON.stringify(clients));
+        // console.log("SENDING FOR ROOM "+roomId);
+        // console.log(JSON.stringify(clients));
 
         var xx = 1;
         clients.forEach((client) => {
