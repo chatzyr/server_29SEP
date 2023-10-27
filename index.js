@@ -6,6 +6,7 @@ const express = require("express"),
     moment = require("moment-timezone"),
     cors = require("cors"),
     WebSocket = require("ws"),
+    
     http = require("http"),
     app = express(),
     PORT = process.env.PORT || 3000;
@@ -22,11 +23,143 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
     userRoutes = require("./routes/userRoutes"),
     { connect: connect } = require("./models/user"),
     Notification = require("./models/notifications"),
+    Otp = require("./models/otp"),
     server = http.createServer(app);
 
 //message--------------------------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------------------------------------//
+var nodemailer = require('nodemailer');
+const bcrypt = require("bcrypt");
+function genotp() {
+    const min = 10000;
+    const max = 99999;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function sendotp(u, o) {
+    try {
+
+        Otp.deleteMany({ user: u }).then((result) => {
+            // console.log(`Deletesd documents`);
+
+            const newOtp = new Otp({
+                user: u,
+                code: o,
+            });
+
+
+            newOtp.save().then(() => {
+                // console.log('New document added successfully');
+            }).catch((err) => {
+                console.error(err);
+            });
+
+        }).catch((err) => {
+            console.error(err);
+        });
+
+
+        var transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: 'chatzyr@gmail.com',
+                pass: 'hhcj czgq pczm kynf'
+            }
+        });
+        var mailOptions = {
+            from: 'chatzyr@gmail.com',
+            to: u,
+            subject: '🔐 Verify Your Email for OTP',
+            html: `
+            <html>
+                <head>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            background-color: #f2f2f2;
+                        }
+                        .container {
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                            background-color: #ffffff;
+                            border-radius: 8px;
+                        }
+                        h1 {
+                            color: #007BFF;
+                            text-align: center;
+                        }
+                        p {
+                            color: #333;
+                            font-size: 16px;
+                            text-align: center;
+                        }
+                        .otp {
+                            font-size: 24px;
+                            font-weight: bold;
+                            color: #FF5733;
+                            text-align: center;
+                            margin-top: 20px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>🔐 Verify Your Email for ChatZyr </h1>
+                        <p>Hi there! Please verify your email to complete the OTP verification process.</p>
+                        <p>Your OTP: <span class="otp">${o}</span></p>
+                    </div>
+                </body>
+            </html>
+        `
+        };
+        transporter.sendMail(mailOptions, function (error, info) {
+            if (error) {
+                console.log(error);
+            } else {
+
+                //   console.log('Email sent: ' + info.response);
+            }
+        });
+
+
+        return o;
+    }
+    catch (e) {
+        console.log("Error Sending otp " + e);
+        return 0;
+
+    }
+
+
+}
+
+
+
+async function verifyOtp(u, o) {
+    try {
+        // Find the user in the database
+        const user = await Otp.findOne({ user: u });
+
+        // If the user does not exist, return 0
+        if (!user) {
+            return 0;
+        }
+
+        // Check if the OTP matches the user's OTP
+        if (user.code !== o) {
+            return 0;
+        }
+
+        console.log("OTP Verified");
+        // If the OTP matches, return 1
+        return 1;
+    } catch (error) {
+        console.error('Error:', error);
+        return 0; // Handle the error appropriately
+    }
+}
 
 
 
@@ -94,7 +227,7 @@ const clientsMap = new Map();
 async function fetchAndSendUpdates(roomId, x) {
     try {
         const roomData = await getfromdb(roomId, x);
-        
+
         const clients = roomDataMap.get(roomId) || [];
         // console.log("SENDING FOR ROOM "+roomId);
         // console.log(JSON.stringify(clients));
@@ -314,7 +447,7 @@ async function getfromdb(e, x) {
 //     }
 // }
 
-var roomids=[]
+var roomids = []
 async function updateCoordinatesWithRetry(roomId, userId, x, y) {
     const room = await RoomModel.findOne({ roomId });
 
@@ -358,7 +491,7 @@ setInterval(() => {
 }, 15000); // Check for inactivity every second
 
 wss.on("connection", (e) => {
-        connections.add(e),
+    connections.add(e),
         console.log("WebSocket client connected"),
         e.on("message", async (o) => {
             try {
@@ -476,35 +609,35 @@ wss.on("connection", (e) => {
                 //         roomDataMap.set(roomId, []);
                 //     }
                 //     roomDataMap.get(roomId).push(e);
-                   
+
                 // }
                 else if ("roomId" in s) {
 
                     const roomId = s.roomId;
-                    
+
                     roomMutex.runExclusive(async () => {
-                        
+
                         if (!roomDataMap.has(roomId)) {
-                            console.log("ROOM NF "+roomId);
+                            console.log("ROOM NF " + roomId);
                             roomDataMap.set(roomId, []);
                             roomids.push(roomId)
                         }
-                        
-                        console.log("ADDED To "+roomId);
+
+                        console.log("ADDED To " + roomId);
                         roomDataMap.get(roomId).push(e);
 
                         roomids.push(roomId)
-                       
-                    }).then(()=>{
+
+                    }).then(() => {
                         const uniqueRoomIds = new Set(roomids);
                         const idx = Array.from(uniqueRoomIds);
                         roomids.length = 0;
-                        roomids=[]
-                        
+                        roomids = []
+
                         idx.forEach((roome) => {
                             fetchAndSendUpdates(roome);
-                          });
-                          console.log("SENT UPDATES!!");
+                        });
+                        console.log("SENT UPDATES!!");
                     }
                     );
                 }
@@ -530,16 +663,95 @@ wss.on("connection", (e) => {
 
 
     app.use(userRoutes),
-    app.get("/fetchver", async (e, o) => {
 
+    app.post("/verotp",
+    async (req, res) => {
         try {
+          console.log(req.body.otp,req.body.email);
+         var a=await verifyOtp(req.body.email, req.body.otp);
+         console.log("AA "+a);
+            if(a)
+            {
+                console.log("DUSTED");
+                res.sendStatus(200);
+                
+            }
+            else{
+                res.sendStatus(203);
+            }
 
-            t = { version: '1.0.5', link: 'https://www.google.com' };
-            o.json(t);
-        } catch (e) {
-            console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
+        } catch (error) {
+            console.log(error);
+            return res.status(500);
         }
-    }),
+    }
+);
+
+
+
+
+
+
+    app.post("/sendotp",
+    async (req, res) => {
+        try {
+          var p=sendotp(req.body.email,genotp())
+            if(p!=0)
+            {
+                res.json({otp: p});
+                // console.log("TOP SEND "+p);
+            }
+
+        } catch (error) {
+            console.log(error);
+            return res.status(500);
+        }
+    }
+);
+    app.post("/resetpassword",
+        async (req, res) => {
+            try {
+                const { email, password } = req.body;
+
+
+                const hashedPassword = await bcrypt.hash(password, 10);
+
+
+
+
+                const user = await User.findOne({ email });
+
+
+                if (!user) {
+                    throw new Error('User not found');
+                }
+
+
+                user.password = hashedPassword;
+
+
+                await user.save();
+                res.sendStatus(200)
+
+            } catch (error) {
+                console.log(error);
+                return res.status(500);
+            }
+        }
+    );
+
+
+
+app.get("/fetchver", async (e, o) => {
+
+    try {
+
+        t = { version: '1.0.5', link: 'https://www.google.com' };
+        o.json(t);
+    } catch (e) {
+        console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
+    }
+}),
     app.get("/fetchData", async (e, o) => {
 
         try {
