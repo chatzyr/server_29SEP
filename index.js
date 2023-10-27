@@ -152,7 +152,7 @@ async function verifyOtp(u, o) {
             return 0;
         }
 
-        console.log("OTP Verified");
+        // console.log("OTP Verified");
         // If the OTP matches, return 1
         return 1;
     } catch (error) {
@@ -667,9 +667,9 @@ wss.on("connection", (e) => {
     app.post("/verotp",
     async (req, res) => {
         try {
-          // console.log(req.body.otp,req.body.email);
+        //   console.log(req.body.otp,req.body.email);
          var a=await verifyOtp(req.body.email, req.body.otp);
-         // console.log("AA "+a);
+         console.log("AA "+a);
             if(a)
             {
                 // console.log("DUSTED");
@@ -767,7 +767,7 @@ app.get("/fetchver", async (e, o) => {
     }),
     app.post('/fetchcolors', async (req, res) => {
         const { userid } = req.body.a
-        console.log("AA " + userid);
+        // console.log("AA " + userid);
         try {
             const t = await User.find({ email: userid }, { _id: 0, chatcolor: 1, premium: 1 });
 
