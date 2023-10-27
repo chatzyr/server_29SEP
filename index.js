@@ -174,7 +174,7 @@ function generateRandomString() {
 
 
 function getlink(link) {
-    var startIndex = link.indexOf("v="); // Find the index of "v="
+    var startIndex = link.indexOf("v="); // Find thes index of "v="
     if (startIndex !== -1) {
         startIndex += 2; // Move to the character after "v="
         var endIndex = link.indexOf("&", startIndex); // Find the index of "&" after "v="
