@@ -667,12 +667,12 @@ wss.on("connection", (e) => {
     app.post("/verotp",
     async (req, res) => {
         try {
-          console.log(req.body.otp,req.body.email);
+          // console.log(req.body.otp,req.body.email);
          var a=await verifyOtp(req.body.email, req.body.otp);
-         console.log("AA "+a);
+         // console.log("AA "+a);
             if(a)
             {
-                console.log("DUSTED");
+                // console.log("DUSTED");
                 res.sendStatus(200);
                 
             }
