@@ -51,7 +51,7 @@ function sendotp(u, o) {
 
 
             newOtp.save().then(() => {
-                // console.log('New document added successfully');
+                // console.log('New document added successsfully');
             }).catch((err) => {
                 console.error(err);
             });
