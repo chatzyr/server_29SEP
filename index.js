@@ -19,6 +19,7 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
     User = require("./models/user"),
     Offer = require("./models/offermodal"),
     Mods = require("./models/mods"),
+        Banned = require("./models/banned"),
     PersonalMessage = require('./models/personalmessage'),
     userRoutes = require("./routes/userRoutes"),
     { connect: connect } = require("./models/user"),
@@ -809,13 +810,13 @@ app.get("/fetchver", async (e, o) => {
     }
 }),
     app.get("/fetchData", async (e, o) => {
-
         try {
             // console.log("fetch data");
             const e = await RoomModel.find(),
                 s = await Offer.aggregate([{ $project: { _id: 0, __v: 0 } }]),
                 r = await Mods.aggregate([{ $project: { _id: 0, __v: 0 } }]),
-                t = { documents: e, offer: s[0], mymods: r };
+                rx = await Banned.aggregate([{ $project: { _id: 0, __v: 0 } }]),
+                t = { documents: e, offer: s[0], mymods: r ,banned: rx};
             o.json(t);
         } catch (e) {
             console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
