@@ -803,7 +803,7 @@ app.get("/fetchver", async (e, o) => {
 
     try {
 
-        t = { version: '1.0.5', link: 'https://www.google.com' };
+        t = { version: '1.0.6', link: 'https://www.google.com' };
         o.json(t);
     } catch (e) {
         console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
