@@ -26,11 +26,11 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
     Otp = require("./models/otp"),
     server = http.createServer(app);
 
-//message--------------------------------------------------------------------------------------------
-
-//---------------------------------------------------------------------------------------------------------//
-var nodemailer = require('nodemailer');
+    var nodemailer = require('nodemailer');
 const bcrypt = require("bcrypt");
+
+
+
 function genotp() {
     const min = 10000;
     const max = 99999;
@@ -174,7 +174,7 @@ function generateRandomString() {
 
 
 function getlink(link) {
-    var startIndex = link.indexOf("v="); // Find thes index of "v="
+    var startIndex = link.indexOf("v="); // Find the index of "v="
     if (startIndex !== -1) {
         startIndex += 2; // Move to the character after "v="
         var endIndex = link.indexOf("&", startIndex); // Find the index of "&" after "v="
@@ -663,6 +663,60 @@ wss.on("connection", (e) => {
 
 
     app.use(userRoutes),
+
+
+    app.post("/unblockuser",
+    async (req, res) => {
+        const { roomIdx, userIdx } = req.body;
+        // console.log(roomIdx,userIdx);
+
+    try {
+        // Find the room document by roomId
+        const room = await RoomModel.findOne({ roomId: roomIdx });
+
+        if (!room) {
+            return res.status(404).json({ message: 'Room not found' });
+        }
+
+        // Check if the user is in the blocked array
+        const userIndex = room.blocked.indexOf(userIdx);
+        // console.log( "ss "+userIndex);
+        if (userIndex !== -1) {
+            // Remove the user from the blocked array
+            room.blocked.splice(userIndex, 1);
+
+            // Save the updated room document
+            await room.save();
+            fetchAndSendUpdates(roomIdx)
+            return res.sendStatus(200)
+          
+        } else {
+
+            return res.sendStatus(404)
+        }
+    } 
+    catch (error) {
+        console.error(error);
+        return res.sendStatus(500)
+    }
+    }
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     app.post("/verotp",
     async (req, res) => {
