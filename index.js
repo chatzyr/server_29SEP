@@ -1074,30 +1074,31 @@ app.post("/changecolor", async (req, res) => {
         return res.status(500).json({ error: 'An error occurred while updating the color' });
     }
 }),
-    app.post("/muteuser", async (e, o) => {
-        const { u: s, t: r, romid: t } = e.body.mutedata;
-        try {
-            const e = await mongoose.startSession();
-            e.startTransaction();
-            const o = await RoomModel.findOne({ roomId: t });
-            o && (o.muted.push(s), o.muted.push(r), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("Muted Sucessfully!");
-            fetchAndSendUpdates(t)
-        } catch (e) {
-            console.log("error muting " + e);
-        }
-    }),
-    // app.post("/blockuser", async (e, o) => {
-    //     const { u: s, rx: r } = e.body.blockdata;
+    // app.post("/muteuser", async (e, o) => {
+    //     const { u: s, t: r, romid: t } = e.body.mutedata;
     //     try {
     //         const e = await mongoose.startSession();
     //         e.startTransaction();
-    //         const o = await RoomModel.findOne({ roomId: r });
-    //         o && (o.blocked.push(s), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("User Blocked Sucessfully!");
-    //      fetchAndSendUpdates(r)
+    //         const o = await RoomModel.findOne({ roomId: t });
+    //         o && (o.muted.push(s), o.muted.push(r), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("Muted Sucessfully!");
+    //         fetchAndSendUpdates(t)
     //     } catch (e) {
-    //         console.log("error Blocking user:  " + e);
+    //         console.log("error muting " + e);
     //     }
     // }),
+   
+    app.post("/muteuser", async (req, res) => {
+        const { mutedata: { u: userId, t: time } } = req.body;
+      
+        // Update all rooms to mute the user.
+        await RoomModel.updateMany({}, { $addToSet: { muted: { userId, time } } });
+      
+        // Fetch and send updates to all rooms where the user was muted.
+        const rooms = await RoomModel.find({ muted: userId });
+        rooms.forEach((room) => fetchAndSendUpdates(room.roomId));
+      console.log("MUTED SUCESSFULLY ");
+        res.sendStatus(200);
+      });
     app.post("/blockuser", async (req, res) => {
         const { u: userToBlock, rx: roomId } = req.body.blockdata;
 
