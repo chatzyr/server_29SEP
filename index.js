@@ -1087,8 +1087,8 @@ app.post("/changecolor", async (req, res) => {
     //     }
     // }),
     app.post("/muteuser", async (req, res) => {
-        const { u, t,roomid } = req.body; // Assuming you have these values
-    
+        const { u, t,roomid } = req.body.mutedata; // Assuming you have these values
+        // console.log(u,t);
         try {
             const rooms = await RoomModel.find({});
     
@@ -1100,9 +1100,11 @@ app.post("/changecolor", async (req, res) => {
                     room.muted.push(t);
                     
                     room.save();
+                    fetchAndSendUpdates(room.roomId)
                 }
     
-                console.log("User muted in all rooms!");
+                // console.log("User muted in all rooms!");
+
                 res.status(200).send("User muted in all rooms!");
             } else {
                 console.log("No rooms found");
