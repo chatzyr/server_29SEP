@@ -777,7 +777,9 @@ wss.on("connection", (e) => {
 
 
                 if (!user) {
+                    res.sendStatus(202)
                     throw new Error('User not found');
+                
                 }
 
 
