@@ -1086,19 +1086,34 @@ app.post("/changecolor", async (req, res) => {
     //         console.log("error muting " + e);
     //     }
     // }),
-   
     app.post("/muteuser", async (req, res) => {
-        const { mutedata: { u: userId, t: time } } = req.body;
-      
-        // Update all rooms to mute the user.
-        await RoomModel.updateMany({}, { $addToSet: { muted: { userId, time } } });
-      
-        // Fetch and send updates to all rooms where the user was muted.
-        const rooms = await RoomModel.find({ muted: userId });
-        rooms.forEach((room) => fetchAndSendUpdates(room.roomId));
-      console.log("MUTED SUCESSFULLY ");
-        res.sendStatus(200);
-      });
+        const { u, t,roomid } = req.body; // Assuming you have these values
+    
+        try {
+            const rooms = await RoomModel.find({});
+    
+            if (rooms && rooms.length > 0) {
+                for (const room of rooms) {
+                    // Create a mute entry with the user and timestamp
+                    
+                    room.muted.push(u);
+                    room.muted.push(t);
+                    
+                    room.save();
+                }
+    
+                console.log("User muted in all rooms!");
+                res.status(200).send("User muted in all rooms!");
+            } else {
+                console.log("No rooms found");
+                res.status(404).send("No rooms found");
+            }
+        } catch (error) {
+            console.log("Error muting: " + error);
+            res.status(500).send("Error muting: " + error);
+        }
+    });
+  
     app.post("/blockuser", async (req, res) => {
         const { u: userToBlock, rx: roomId } = req.body.blockdata;
 
