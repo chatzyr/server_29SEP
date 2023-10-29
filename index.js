@@ -32,6 +32,46 @@ const bcrypt = require("bcrypt");
 
 
 
+
+
+async function deleteMessages (userToBeDeleted)
+{
+
+
+    try {
+       
+        const rooms = await Message.find({
+          messages: {
+            $elemMatch: {
+              user_id: userToBeDeleted
+            }
+          }
+        });
+      
+        if (rooms && rooms.length > 0) {
+          // Iterate through each room
+        //   console.log("YES");
+          for (const room of rooms) {
+            // Filter the messages to exclude the user's messages
+            room.messages = room.messages.filter(message => message.user_id !== userToBeDeleted);
+      
+            // Save the updated room
+            await room.save();
+            return 1;
+            // console.log('Deleting...');
+          }
+        //   console.log('del done');
+        }
+        else{
+            // console.log("FOUND NOTHING IN ROOMS");
+            return 2;
+        }
+      } catch (error) {
+        // Handle the error
+      console.log("ERR" +error);
+      return 0;
+    }
+}
 function genotp() {
     const min = 10000;
     const max = 99999;
@@ -237,7 +277,7 @@ async function fetchAndSendUpdates(roomId, x) {
         clients.forEach((client) => {
 
             client.send(JSON.stringify(roomData));
-            console.log("SENDING TO CLIENT " + xx);
+            // console.log("SENDING TO CLIENT " + xx);
             xx++;
 
         });
@@ -340,6 +380,13 @@ async function getfromdb(e, x) {
             console.log("CANT FETCH MESSAGES " + e);
         }
     }
+    if(x==2)
+    {
+        
+    }
+
+
+
     try {
         const o = e,
             s = await Message.aggregate([
@@ -475,8 +522,8 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
     }
 
     await room.save();
-    fetchAndSendUpdates(roomId);
-    console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
+    fetchAndSendUpdates(roomId,2);
+    // console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
 }
 const activeUsers = new Map(); // Use a Map to store active users and their last active time
 const inactivityTimeout = 2.5 * 60 * 1000; // 2.5 minutes in milliseconds
@@ -530,46 +577,61 @@ wss.on("connection", (e) => {
                 else if (s.messageType === "text") {
                     // Save the chat message to MongoDB using Mongoose
                     try {
-                        const { senderId, recipientId, messageType, message } = s;
-                        // console.log(senderId, recipientId);
-
-
-                        const newMessage = new PersonalMessage({
-                            senderId,
-                            recepientId: recipientId,
-                            messageType,
-                            message: message,
-                            timestamp: new Date(),
-                        });
-
-                        await newMessage.save();
-                        // console.log('message sent!');
-                        // Broadcast the message to all connected clients
-                        wss.clients.forEach((client) => {
-                            if (client !== e && client.readyState === WebSocket.OPEN) {
-                                client.send(JSON.stringify(newMessage));
-                            }
-                        });
-
-
-                        const messageCount = await PersonalMessage.countDocuments({ senderId, recepientId: recipientId });
-
-                        // If the count exceeds the limit (e.g., 60), delete the oldest message
-                        const messageLimit = 60;
-                        if (messageCount > messageLimit) {
-                            const oldestMessage = await PersonalMessage.findOne(
-                                { senderId, recepientId: recipientId },
-                                {},
-                                { sort: { timestamp: 1 } } // Find the oldest message
-                            );
-
-                            // Delete the oldest message
-                            await oldestMessage.remove();
+                      const { senderId, recipientId, messageType, message } = s;
+                      // console.log(senderId, recipientId);
+          
+                      const newMessage = new PersonalMessage({
+                        senderId,
+                        recepientId: recipientId,
+                        messageType,
+                        message: message,
+                        timestamp: new Date(),
+                      });
+          
+                      await newMessage.save();
+                      // console.log('message sent!');
+                      // Broadcast the message to all connected clients
+                      wss.clients.forEach((client) => {
+                        // console.log(client);
+                        if (client !== e && client.readyState === WebSocket.OPEN) {
+                          client.send(JSON.stringify(newMessage));
                         }
+                      });
+          
+                      const messageCount = await PersonalMessage.countDocuments({
+                        senderId,
+                        recepientId: recipientId,
+                      });
+          
+                      // If the count exceeds the limit (e.g., 60), delete the oldest message
+                      const messageLimit = 40;
+                      console.log(messageCount);
+                      if (messageCount > messageLimit) {
+                        const oldestMessage = await PersonalMessage.findOne(
+                          {
+                            $or: [
+                              { senderId, recepientId: recipientId },
+                              { senderId: recipientId, recepientId: senderId },
+                      ],
+                          },
+                          {},
+                          { sort: { timestamp: 1 } }
+                        );
+                      
+                        if (oldestMessage) {
+                          // console.log(oldestMessage);
+                          
+                          // Delete the oldest message
+                          await PersonalMessage.deleteOne({ _id: oldestMessage._id });
+                          // console.log(oldestMessage+ ' msg deleted');
+                        }
+                      } else {
+                        console.error("No messages found to remove.");
+                      }
                     } catch (error) {
-                        console.error("Error saving chat message:", error);
+                      console.error("Error saving chat message:", error);
                     }
-                }
+                  }
 
                 else if (s.action === "getMessages") {
                     const { senderEmail, recipientEmail } = s.data;
@@ -932,29 +994,48 @@ app.post("/warning-notifications", async (e, o) => {
         try {
             const { sender: s, recipient: r, message: t, type: a, } = req.body;
 
-            if (a === 'friendRequest') {
+            if (a === "friendRequest") {
                 // Check if recipient is already a friend
                 const recipientUser = await User.findOne({ email: r });
-
-                if (recipientUser && recipientUser.friends.some(friend => friend.email === s)) {
-                    console.log('already a friend');
-                    // The recipient is already a friend, send a response
-                    return res.status(200).json({ message: "You are already friends with this user" });
+        
+                if (
+                  recipientUser &&
+                  recipientUser.friends.some((friend) => friend.email === s)
+                ) {
+                  console.log("already a friend");
+                  // The recipient is already a friend, send a response
+                  return res
+                    .status(200)
+                    .json({ message: "You are already friends with this user" });
                 } else {
-                    const senderUser = await User.findOne({ email: s });
-                    const notification = new Notification({
-                        sender: s,
-                        recipient: r,
-                        message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
-                        type: a,
-                        pic: senderUser.pic // Use sender's picture
-                    });
-
-                    await notification.save();
-                    res.status(201).json({ message: "Notification created" });
-                    console.log("Notification created");
+                  const existingFriendRequest = await Notification.findOne({
+                    sender: s,
+                    recipient: r,
+                    type: "friendRequest",
+                    read: false,
+                  });
+        
+                  if (existingFriendRequest) {
+                    console.log("Friend request notification already sent");
+                    return res
+                      .status(202)
+                      .json({ message: "Friend request already sent" });
+                  }
+        
+                  const senderUser = await User.findOne({ email: s });
+                  const notification = new Notification({
+                    sender: s,
+                    recipient: r,
+                    message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+                    type: a,
+                    pic: senderUser.pic, // Use sender's picture
+                  });
+        
+                  await notification.save();
+                  res.status(201).json({ message: "Notification created" });
+                  console.log("Notification created");
                 }
-            }
+              }
             if (a === 'profileLike') {
                 // Check if recipient is already a friend
                 const recipientUser = await User.findOne({ email: r });
@@ -1345,6 +1426,112 @@ app.post("/removeprofilepic", async (e, o) => {
             await s.abortTransaction(), s.endSession(), console.error(e), o.status(500).json({ message: "An error occurred" });
         }
     }),
+
+
+
+
+
+    app.delete('/deleteAccount/:email', async (req, res) => {
+        const { email } = req.params;
+      
+        const session = await mongoose.startSession();
+        session.startTransaction();
+      
+        try {
+          // Delete the user document from the User collection
+          await User.findOneAndDelete({ email }).session(session);
+      
+          
+    
+    
+    
+      
+          // Delete notifications sent to or from the user from the Notification model
+          await Notification.deleteMany({ $or: [{ sender: email }, { recipient: email }] }).session(session);
+      
+          const modDocument = await Mods.findOne({
+            $or: [
+                { mod1: email },
+                { mod2: email },
+            ],
+        });
+    
+        if (modDocument) {
+            // Remove the user from either mod1 or mod2
+            if (modDocument.mod1.includes(email)) {
+                modDocument.mod1 = modDocument.mod1.filter(user => user !== email);
+            } else {
+                modDocument.mod2 = modDocument.mod2.filter(user => user !== email);
+            }
+    
+            // Save the updated document
+            await modDocument.save();
+    
+         
+            // res.status(200).send(Deleted user: ${userToBeDeleted} from mods);
+        } else {
+           
+            // res.status(404).send('User not found in mods`);
+        }
+    
+        const result = await deleteMessages(email);
+        
+    
+          // Commit the transaction
+          await session.commitTransaction();
+          session.endSession();
+      
+          // Respond with a success message
+        
+          if (result === 1) {
+            console.log('User deleted successfully.');
+            res.json({ message: 'User account and associated data deleted successfully.' });
+          } else {
+            console.log('User deletion failed.');
+          }
+        } catch (error) {
+          // Rollback the transaction in case of an error
+          await session.abortTransaction();
+          session.endSession();
+          console.error(error);
+          res.status(500).json({ error: 'An error occurred while deleting the user account.' });
+        }
+      });
+
+      app.get('/search', async (req, res) => {
+        const { query } = req.query;
+        try {
+          const results = await User.find({ username: { $regex: query, $options: 'i' } });
+          res.json(results);
+        } catch (error) {
+          console.error(error);
+          res.status(500).json({ error: 'Internal server error' });
+        }
+      });
+
+
+      app.get("/user", async (req, res) => {
+        try {
+          const userEmail = req.query.email;
+      
+          if (!userEmail) {
+            return res.status(400).json({ message: "Email is required" });
+          }
+      
+          // Find the user by their email in the MongoDB database
+          const user = await User.findOne({ email: userEmail });
+      
+          if (!user) {
+            return res.status(404).json({ message: "User not found" });
+          }
+      
+          // Return the user details in the response
+          res.status(200).json(user);
+        } catch (error) {
+          console.error(error);
+          res.status(500).json({ message: "Server error" });
+        }
+      });
 
 
     server.listen(PORT, () => {
