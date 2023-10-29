@@ -51,7 +51,7 @@ function sendotp(u, o) {
 
 
             newOtp.save().then(() => {
-                // console.log('New document added successsfully');
+                // console.log('New document added successfully');
             }).catch((err) => {
                 console.error(err);
             });
@@ -214,7 +214,7 @@ function getlink(link) {
 mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
     mongoose.connection.on("connected", () => {
         console.log("DB connection successful");
-
+        
     }),
     mongoose.connection.on("error", (e) => {
         console.log("DB connection failed", e);
@@ -356,6 +356,7 @@ async function getfromdb(e, x) {
                 $project: {
                     _id: 0,
                     chatcolor: 1, // Include the chatcolor field
+                    usernamecolor: 1,
                     username: 1,
                     password: 1,
                     email: 1,
@@ -374,9 +375,10 @@ async function getfromdb(e, x) {
             { $project: { _id: 0 } }
         ]);
         const n = t.reduce((e, o) => {
-            const { chatcolor, username: s, password: r, email: t, badge: a, pic: n, backgroundPic: i, bio: c, likes: d, friends: m, premium: l } = o;
+            const { usernamecolor,chatcolor, username: s, password: r, email: t, badge: a, pic: n, backgroundPic: i, bio: c, likes: d, friends: m, premium: l } = o;
             return (e[t] = {
                 chatcolor, // Add chatcolor to the object
+                usernamecolor,
                 name: s,
                 email: t,
                 password: r,
@@ -1069,6 +1071,31 @@ app.post("/changecolor", async (req, res) => {
         } else {
             // User not found
             return res.status(404).json({ error: 'User not found' });
+        }
+    } catch (e) {
+        console.error("Error updating color: " + e);
+        return res.status(500).json({ error: 'An error occurred while updating the color' });
+    }
+}),
+app.post("/changeusernamecolor", async (req, res) => {
+    const { user, hex } = req.body.det;
+    // console.log("COLOR UPDATED "+user+ hex);
+    try {
+        // Find the user by their email and update the color
+        const updatedUser = await User.findOneAndUpdate(
+            { email: user },
+            { usernamecolor: hex },
+            { new: true } // This option returns the updated document
+        );
+
+        if (updatedUser) {
+            // User found and color updated
+            // console.log("COLOR UPDATED " + user + hex);
+            return res.sendStatus(200)
+
+        } else {
+            // User not found
+            return res.sendStatus(404)
         }
     } catch (e) {
         console.error("Error updating color: " + e);
