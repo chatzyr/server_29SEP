@@ -30,7 +30,37 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
     var nodemailer = require('nodemailer');
 const bcrypt = require("bcrypt");
 
-
+async function deleteCoordinates(deleteemail) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const roomsToDelete = await RoomModel.find({
+        coordinates: {
+          $elemMatch: {
+            email: deleteemail,
+          },
+        },
+      }).session(session);
+  
+      for (const room of roomsToDelete) {
+        // Filter the coordinates for the specified email
+        room.coordinates = room.coordinates.filter(coord => coord.email !== deleteemail);
+        
+        // Save the updated room
+        await room.save();
+      }
+  
+      await session.commitTransaction();
+      session.endSession();
+      
+    //   console.log(${deleteemail}'s coordinates deleted from rooms.);
+    } catch (error) {
+      // Handle any potential errors
+      await session.abortTransaction();
+      session.endSession();
+      console.error(error);
+    }
+  }
 
 
 
@@ -104,12 +134,12 @@ function sendotp(u, o) {
         var transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
-                user: 'chatzyr@gmail.com',
-                pass: 'hhcj czgq pczm kynf'
+                user: 'Info.chatzyr@gmail.com',
+                pass: 'haan rydj ivyx adcr'
             }
         });
         var mailOptions = {
-            from: 'chatzyr@gmail.com',
+            from: 'Info.chatzyr@gmail.com',
             to: u,
             subject: '🔐 Verify Your Email for OTP',
             html: `
@@ -313,9 +343,9 @@ async function addservermessage(e, o) {
             // The email doesn't exist, so add coordinates
             room.coordinates.push({ email: emailToCheck, x: 215, y: 125 });
             await room.save();
-            console.log('Coordinates added successfully.');
+            // console.log('Coordinates added successfully.');
         } else {
-            console.log('Coordinates already exist.');
+            // console.log('Coordinates already exist.');
             checking = 1;
         }
 
@@ -354,7 +384,7 @@ async function addservermessage(e, o) {
             else {
                 fetchAndSendUpdates(r);
             }
-            console.log("MSG ADDED");
+            // console.log("MSG ADDED");
         }
 
         // console.log("Operation completed successfully");
@@ -380,10 +410,7 @@ async function getfromdb(e, x) {
             console.log("CANT FETCH MESSAGES " + e);
         }
     }
-    if(x==2)
-    {
-        
-    }
+    
 
 
 
@@ -516,13 +543,13 @@ async function updateCoordinatesWithRetry(roomId, userId, x, y) {
     if (room.coordinates[userIndex]) {
         room.coordinates[userIndex].x = x;
         room.coordinates[userIndex].y = y;
-        console.log("UPDATING COORD");
+        // console.log("UPDATING COORD");
     } else {
         room.coordinates[userIndex] = { email: userId, x, y };
     }
 
     await room.save();
-    fetchAndSendUpdates(roomId,2);
+    fetchAndSendUpdates(roomId);
     // console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
 }
 const activeUsers = new Map(); // Use a Map to store active users and their last active time
@@ -534,7 +561,7 @@ setInterval(() => {
             // User has been inactive for more than the specified time
             // Remove the user from activeUsers and close the connection
             activeUsers.delete(email);
-            console.log("DELETED " + email);
+            // console.log("DELETED " + email);
             // userData.connection.close();
         }
     });
@@ -683,12 +710,12 @@ wss.on("connection", (e) => {
                     roomMutex.runExclusive(async () => {
 
                         if (!roomDataMap.has(roomId)) {
-                            console.log("ROOM NF " + roomId);
+                            // console.log("ROOM NF " + roomId);
                             roomDataMap.set(roomId, []);
                             roomids.push(roomId)
                         }
 
-                        console.log("ADDED To " + roomId);
+                        // console.log("ADDED To " + roomId);
                         roomDataMap.get(roomId).push(e);
 
                         roomids.push(roomId)
@@ -702,7 +729,7 @@ wss.on("connection", (e) => {
                         idx.forEach((roome) => {
                             fetchAndSendUpdates(roome);
                         });
-                        console.log("SENT UPDATES!!");
+                        // console.log("SENT UPDATES!!");
                     }
                     );
                 }
@@ -867,7 +894,7 @@ app.get("/fetchver", async (e, o) => {
 
     try {
 
-        t = { version: '1.0.5', link: 'https://www.google.com' };
+        t = { version: '1.1.0', link: 'https://www.google.com' };
         o.json(t);
     } catch (e) {
         console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
@@ -978,18 +1005,35 @@ app.post("/updatebackgroundpic", async (e, o) => {
         }
     });
 
-app.post("/warning-notifications", async (e, o) => {
-    try {
-        const { sender: s, recipients: r, message: t, type: a, pic: n } = e.body,
-            i = r.map(async (e) => {
-                const o = new Notification({ sender: s, recipient: e, message: t, type: a, pic: n });
-                return await o.save(), o;
-            });
-        await Promise.all(i), o.status(201).json({ message: "Notifications created" }), console.log("Notifications created");
-    } catch (e) {
-        console.error(e), o.status(500).json({ message: "Internal server error" });
-    }
-}),
+    app.post("/warning-notifications", async (req, res) => {
+        try {
+          const { sender: s, recipients: r, message: t, type: a, pic: n } = req.body;
+      
+          const notifications = r.map(async (recipient) => {
+            // Check if recipient is null and handle it
+            if (recipient === null || recipient == "") {
+              // Handle the null recipient case here, you may skip creating the notification or set a default recipient.
+            } else {
+                try{
+              const notification = new Notification({ sender: s, recipient, message: t, type: a, pic: n });
+              await notification.save();
+              return notification;
+                }
+                catch(e)
+                {
+                    console.log("Error creating Noti "+ recipient);
+                }
+            }
+          });
+      
+          await Promise.all(notifications);
+          res.status(201).json({ message: "Notifications created" });
+        //   console.log("Notifications created");
+        } catch (error) {
+          console.error(error);
+          res.status(500).json({ message: "Internal server error" });
+        }
+      });
     app.post("/notifications", async (req, res) => {
         try {
             const { sender: s, recipient: r, message: t, type: a, } = req.body;
@@ -1441,7 +1485,10 @@ app.post("/removeprofilepic", async (e, o) => {
           // Delete the user document from the User collection
           await User.findOneAndDelete({ email }).session(session);
       
-          
+          // Delete messages associated with the user from the Message model
+          // const deletedMessages = await Message.deleteMany({ user_id: email }).session(session);
+          // console.log(Deleted ${deletedMessages.deletedCount} documents.);
+          // console.log(deletedMessages);
     
     
     
@@ -1467,16 +1514,16 @@ app.post("/removeprofilepic", async (e, o) => {
             // Save the updated document
             await modDocument.save();
     
-         
+            // console.log(Deleted user: ${email} from mods);
             // res.status(200).send(Deleted user: ${userToBeDeleted} from mods);
         } else {
-           
+            // console.log(User not found in mods);
             // res.status(404).send('User not found in mods`);
         }
     
         const result = await deleteMessages(email);
         
-    
+          deleteCoordinates(email);
           // Commit the transaction
           await session.commitTransaction();
           session.endSession();
@@ -1494,9 +1541,9 @@ app.post("/removeprofilepic", async (e, o) => {
           await session.abortTransaction();
           session.endSession();
           console.error(error);
-          res.status(500).json({ error: 'An error occurred while deleting the user account.' });
-        }
-      });
+          res.status(500).json({ error: 'An error occurred while deleting the user account.' });
+        }
+      });
 
       app.get('/search', async (req, res) => {
         const { query } = req.query;
@@ -1532,6 +1579,8 @@ app.post("/removeprofilepic", async (e, o) => {
           res.status(500).json({ message: "Server error" });
         }
       });
+
+
 
 
     server.listen(PORT, () => {
