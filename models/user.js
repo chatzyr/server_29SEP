@@ -21,8 +21,9 @@ const userSchema = new mongoose.Schema({
     likedBy: [{ type: String, ref: 'User'}], // Array to store user IDs who have liked this profile
     premium: {type: String, default:"false"},
     friends: [friendSchema],
-    chatcolor: { type: String, default: '#FFFFFF' } // Added chatcolor field
-
+    chatcolor: { type: String, default: '#FFFFFF' }, // Added chatcolor field
+    usernamecolor: { type: String, default: '#FF0000' } // Added chatcolor field
+    
 });
 
 const User = mongoose.model("User", userSchema);
