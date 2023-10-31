@@ -894,7 +894,7 @@ app.get("/fetchver", async (e, o) => {
 
     try {
 
-        t = { version: '1.1.0', link: 'https://www.google.com' };
+        t = { version: '1.1.0', link: 'https://shorturl.at/pBDEP' };
         o.json(t);
     } catch (e) {
         console.error("Error:", e), o.status(500).json({ error: "Internal server error" });
