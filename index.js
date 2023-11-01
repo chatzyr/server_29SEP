@@ -1532,7 +1532,7 @@ app.post("/removeprofilepic", async (e, o) => {
         
           if (result === 1) {
             console.log('User deleted successfully.');
-            res.json({ message: 'User account and associated data deleted successfully.' });
+             res.status(200).json({ message: 'User account and associated data deleted successfully.' });
           } else {
             console.log('User deletion failed.');
           }
