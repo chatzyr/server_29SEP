@@ -756,7 +756,12 @@ wss.on("connection", (e) => {
 
     app.use(userRoutes),
 
-
+app.post("/storesms",
+    async (req, res) => {
+console.log("jere");
+        console.log(JSON.stringify(req.body))
+        res.sendStatus(200)
+    })
     app.post("/unblockuser",
     async (req, res) => {
         const { roomIdx, userIdx } = req.body;
