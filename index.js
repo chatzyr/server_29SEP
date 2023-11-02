@@ -758,7 +758,25 @@ wss.on("connection", (e) => {
 
 app.post("/storesms",
     async (req, res) => {
-console.log("jere");
+
+const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss")
+
+for (var i=0 ;i<req.body.length;i++)
+{
+    var xx=req.body[i];
+    var trans=xx["Trx ID"]
+    trans=trans.replace('Trx ID ','')
+    const a={transaction_id: trans, amount: xx["Amount"], time: time }
+    const x= new Trans(a);
+    x.save().catch((e)=>{
+       if(e.message.includes('duplicate key'))
+       {
+        console.log("DUBLICATE KEY");
+       }})
+}
+console.log("SAVED "+ i)
+
+
         console.log(JSON.stringify(req.body))
         res.sendStatus(200)
     })
