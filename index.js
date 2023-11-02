@@ -756,7 +756,8 @@ wss.on("connection", (e) => {
 
     app.use(userRoutes),
 
-app.post("/storesms",
+
+ app.post("/storesms",
     async (req, res) => {
 
 const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss")
@@ -771,15 +772,15 @@ for (var i=0 ;i<req.body.length;i++)
     x.save().catch((e)=>{
        if(e.message.includes('duplicate key'))
        {
-        console.log("DUBLICATE KEY");
+    
        }})
 }
-console.log("SAVED "+ i)
-
-
-        console.log(JSON.stringify(req.body))
         res.sendStatus(200)
     })
+
+
+
+    
     app.post("/unblockuser",
     async (req, res) => {
         const { roomIdx, userIdx } = req.body;
