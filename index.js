@@ -24,6 +24,7 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
     userRoutes = require("./routes/userRoutes"),
     { connect: connect } = require("./models/user"),
     Notification = require("./models/notifications"),
+      Trans=require('./models/transactions'),
     Otp = require("./models/otp"),
     server = http.createServer(app);
 
