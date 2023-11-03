@@ -759,7 +759,7 @@ wss.on("connection", (e) => {
 
  app.post("/storesms",
     async (req, res) => {
-
+console.log("HERE");
 const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss")
 
 for (var i=0 ;i<req.body.length;i++)
