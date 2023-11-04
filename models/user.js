@@ -22,8 +22,8 @@ const userSchema = new mongoose.Schema({
     premium: {type: String, default:"false"},
     friends: [friendSchema],
     chatcolor: { type: String, default: '#FFFFFF' }, // Added chatcolor field
-    usernamecolor: { type: String, default: '#FF0000' } // Added chatcolor field
-    
+    usernamecolor: { type: String, default: '#FF0000' }, // Added chatcolor field
+    balance:{type: Number, default: 0}
 });
 
 const User = mongoose.model("User", userSchema);
