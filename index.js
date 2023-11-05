@@ -723,6 +723,7 @@ setInterval(() => {
   });
 }, 15000); // Check for inactivity every second
 
+const userConnections = new Map();
 wss.on("connection", (e) => {
   connections.add(e),
     console.log("WebSocket client connected"),
@@ -761,7 +762,9 @@ wss.on("connection", (e) => {
           try {
             const { senderId, recipientId, messageType, message } = s;
             // console.log(senderId, recipientId);
-
+            userConnections.set(senderId, e);
+            const receiverConnection = userConnections.get(recipientId);
+            
             const newMessage = new PersonalMessage({
               senderId,
               recepientId: recipientId,
@@ -771,6 +774,14 @@ wss.on("connection", (e) => {
             });
 
             await newMessage.save();
+
+            if (e.readyState === WebSocket.OPEN) {
+              e.send(JSON.stringify(newMessage));
+            }
+    
+            // if (receiverConnection && receiverConnection.readyState === WebSocket.OPEN) {
+            //   receiverConnection.send(JSON.stringify(newMessage));
+            // }
             // console.log('message sent!');
             // Broadcast the message to all connected clients
             wss.clients.forEach((client) => {
@@ -808,7 +819,7 @@ wss.on("connection", (e) => {
                 // console.log(oldestMessage+ ' msg deleted');
               }
             } else {
-              console.error("No messages found to remove.");
+              // console.error("No messages found to remove.");
             }
           } catch (error) {
             console.error("Error saving chat message:", error);
@@ -896,6 +907,11 @@ wss.on("connection", (e) => {
         const index = clients.indexOf(e);
         if (index !== -1) {
           clients.splice(index, 1); // Remove the disconnected user from the room
+        }
+      });
+      userConnections.forEach((connection, userId) => {
+        if (connection === e) {
+          userConnections.delete(userId);
         }
       });
       connections.delete(e), console.log("WebSocket client disconnected");
