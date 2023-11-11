@@ -29,10 +29,21 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
   (TransactionModel = require("./models/transactions")),
   (PaymentDetailsModel = require("./models/PaymentDetails.Js")),
   (ShopDetails = require("./models/shopdetails")),
+  (webProducts = require("./models/webDetails"))
   (server = http.createServer(app));
 
 var nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
+
+// jsonData.forEach(async (item) => {
+//   try {
+//       const newBadge = new webProducts(item);
+//       await newBadge.save();
+//       console.log(`Saved: ${item.name}`);
+//   } catch (error) {
+//       console.error(`Error saving ${item.name}: ${error}`);
+//   }
+// });
 
 async function deleteCoordinates(deleteemail) {
   const session = await mongoose.startSession();
@@ -166,6 +177,13 @@ function genotp() {
   const max = 99999;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+var transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "Info.chatzyr@gmail.com",
+    pass: "haan rydj ivyx adcr",
+  },
+});
 
 function sendotp(u, o) {
   try {
@@ -191,13 +209,7 @@ function sendotp(u, o) {
         console.error(err);
       });
 
-    var transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: "Info.chatzyr@gmail.com",
-        pass: "haan rydj ivyx adcr",
-      },
-    });
+   
     var mailOptions = {
       from: "Info.chatzyr@gmail.com",
       to: u,
@@ -1012,6 +1024,124 @@ app.post("/verotp", async (req, res) => {
     return res.status(500);
   }
 });
+// Define a route to fetch and store the data
+app.get('/webDetails', async (req, res) => {
+  try {
+      const details = await webProducts.find(); // Retrieve all details from the collection
+      res.json(details); // Send the details as a JSON response
+      // console.log('details Sent!');
+  } catch (error) {
+      console.error('Error fetching web details:', error);
+      res.status(500).send('Error fetching web details');
+  }
+});
+
+// Endpoint to handle order details and send email
+app.post('/sendOrderEmail', (req, res) => {
+  const { prodname, price, orderID,orderDetails } = req.body; // Assume the request contains order details
+
+  // Compose email
+  const mailOptions = {
+      from: orderDetails.email,
+      to: 'chatzyr@gmail.com', // Replace with the specific email
+      subject: 'New Order',
+      text: `New order received!\nDetails:\nOrder ID: ${orderID}\nName: ${orderDetails.name}\nEmail: ${orderDetails.email}\nProduct: ${prodname}\nPrice: $${price}`
+  };
+
+  // Send email
+  transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+          console.log(error);
+          res.status(500).send('Error'); // Handle error response
+      } else {
+          // console.log('Email sent: ' + info.response);
+          res.send('Email sent'); // Send success response
+      }
+  });
+});
+
+app.post("/sendcoin", async (req, res) => {
+
+  const { sendby, sendto, amount } = req.body;
+console.log(sendto);
+  const session = await mongoose.startSession();
+
+  try {
+
+    await session.withTransaction(async () => {
+
+      // Find the sender user
+
+      const user = await User.findOne({ email: sendby }).session(session);
+      const userx = await User.findOne({ email: sendto }).session(session);
+      if (!user || !userx) {
+       
+        res.sendStatus(203);
+        if (!userx)
+        console.log("User Not Found Receiver ");
+        return null;
+
+      }
+   
+
+      if (user.balance < amount) {
+        
+        res.sendStatus(205); // Change the status code to 400 for a bad request
+
+        return null;
+
+      }
+
+      // Update the sender's balance
+
+
+      var xa =parseFloat(parseFloat(user.balance) - parseFloat(amount));
+      user.balance=xa.toString();
+
+
+      await user.save();
+     
+
+      // Find the recipient user
+
+     
+
+      
+      // Update the recipient's balance
+
+      var x =parseFloat(parseFloat(userx.balance) + parseFloat(amount));
+      userx.balance=x.toString();
+
+      await userx.save();
+    
+
+    });
+
+    // Send a success response
+
+    res.sendStatus(200);
+
+  } catch (e) {
+   
+    if (session.inTransaction()) {
+     
+      
+      await session.abortTransaction();
+    }
+
+    
+  } 
+
+  finally {
+   
+
+    session.endSession(); // Close the session when done
+
+  }
+
+});
+
+
 
 app.post("/buyitem", async (req, res) => {
   const session = await mongoose.startSession();
@@ -1034,6 +1164,7 @@ app.post("/buyitem", async (req, res) => {
       const shopItem = await PackageModel.findOne({ id: itemid }).session(
         session
       );
+      
 
       if (!shopItem) {
         throw new Error("Shop item not found");
@@ -1116,7 +1247,7 @@ app.post("/buyitem", async (req, res) => {
       const a = await mergedates(userid,itemid);
       if(a!=0){
 
-        res.status(200).json({date: a});
+        res.status(200).json({date: a,title:shopItem.title});
         await session.commitTransaction();
         session.endSession();
 
@@ -1515,7 +1646,7 @@ app.post("/notifications", async (req, res) => {
         const notification = new Notification({
           sender: s,
           recipient: r,
-          message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+          message:` ${senderUser.username} ${t}`, // Concatenate sender's name with message
           type: a,
           pic: senderUser.pic, // Use sender's picture
         });
@@ -1540,11 +1671,28 @@ app.post("/notifications", async (req, res) => {
       res.status(201).json({ message: "Notification created" });
       // console.log("Notification created");
     }
+    if (a === "coins") {
+      // Check if recipient is already a friend
+      const recipientUser = await User.findOne({ email: r });
+      const senderUser = await User.findOne({ email: s });
+      const notification = new Notification({
+        sender: s,
+        recipient: r,
+        message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+        type: a,
+        pic: senderUser.pic, // Use sender's picture
+      });
+      await notification.save();
+      res.status(201).json({ message: "Notification created" });
+      // console.log("Notification created");
+    }
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
+  
 });
+
 app.post("/addfriend", async (e, o) => {
   const {
     username: s,
