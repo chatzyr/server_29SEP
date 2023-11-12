@@ -29,6 +29,7 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
   (TransactionModel = require("./models/transactions")),
   (PaymentDetailsModel = require("./models/PaymentDetails.Js")),
   (ShopDetails = require("./models/shopdetails")),
+  (Custom = require("./models/custom")),
   (webProducts = require("./models/webDetails"))
   (server = http.createServer(app));
 
@@ -44,6 +45,15 @@ const bcrypt = require("bcrypt");
 //       console.error(`Error saving ${item.name}: ${error}`);
 //   }
 // });
+// PersonalMessage.updateMany({}, { $set: { read: true } })
+//   .then((result) => {
+//     console.log("Documents updated successfully:", result);
+//     // Process the result
+//   })
+//   .catch((err) => {
+//     console.error("Error updating documents:", err);
+//     // Handle the error
+//   });
 
 async function deleteCoordinates(deleteemail) {
   const session = await mongoose.startSession();
@@ -82,52 +92,52 @@ async function deleteCoordinates(deleteemail) {
 
 
 async function mergedates(p,i) {
-    const currentDate = moment().tz("Asia/Karachi");
-    const shopDetailsDocuments = await ShopDetails.find({ purchasedBy: p, itemId: i });
-    var dates = [];
+  const currentDate = moment().tz("Asia/Karachi");
+  const shopDetailsDocuments = await ShopDetails.find({ purchasedBy: p, itemId: i });
+  var dates = [];
 
-    // Iterate over the ShopDetails documenstss
-    for (const shopDetailsDocument of shopDetailsDocuments) {
-        // Get the purchase date
-        dates.push(shopDetailsDocument.validtill);
-    }
-    await ShopDetails.deleteMany({ _id: { $in: shopDetailsDocuments.map(shopDetailsDocument => shopDetailsDocument._id) } });
+  // Iterate over the ShopDetails documenstss
+  for (const shopDetailsDocument of shopDetailsDocuments) {
+      // Get the purchase date
+      dates.push(shopDetailsDocument.validtill);
+  }
+  await ShopDetails.deleteMany({ _id: { $in: shopDetailsDocuments.map(shopDetailsDocument => shopDetailsDocument._id) } });
 
 
 
-    const futureDates = dates.filter(dateStr => {
-        const date = moment.tz(dateStr, "Asia/Karachi");
-        return date.isSameOrAfter(currentDate);
-    });
+  const futureDates = dates.filter(dateStr => {
+      const date = moment.tz(dateStr, "Asia/Karachi");
+      return date.isSameOrAfter(currentDate);
+  });
 
-    if (futureDates.length > 0) {
-        
-        const totalDaysToAdd = futureDates.reduce((total, dateStr) => {
-            const date = moment.tz(dateStr, "Asia/Karachi");
-            const daysDifference = date.diff(currentDate, 'days');
-            return total + daysDifference;
-        }, 0);
-        const newDate = currentDate.add(totalDaysToAdd, 'days');
-        const finalDate = newDate.format("YYYY-MM-DD HH:mm:ss");
-        const finalDatex = newDate.format("DD-MM-YYYY");
-        
-        console.log(finalDate);
+  if (futureDates.length > 0) {
+      
+      const totalDaysToAdd = futureDates.reduce((total, dateStr) => {
+          const date = moment.tz(dateStr, "Asia/Karachi");
+          const daysDifference = date.diff(currentDate, 'days');
+          return total + daysDifference;
+      }, 0);
+      const newDate = currentDate.add(totalDaysToAdd, 'days');
+      const finalDate = newDate.format("YYYY-MM-DD HH:mm:ss");
+      const finalDatex = newDate.format("DD-MM-YYYY");
+      
+ 
 
-        const asx = {
-            itemId: i,
-            purchasedBy: p,
-            purchaseDate: moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),
+      const asx = {
+          itemId: i,
+          purchasedBy: p,
+          purchaseDate: moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),
 
-            validtill: finalDate,
+          validtill: finalDate,
 
-        }
-        const h = new ShopDetails(asx)
-        await h.save();
-        
+      }
+      const h = new ShopDetails(asx)
+      await h.save();
+      
 
-        return finalDatex;
-    }
-    return 0;
+      return finalDatex;
+  }
+  return 0;
 
 
 }
@@ -736,6 +746,7 @@ setInterval(() => {
 }, 15000); // Check for inactivity every second
 
 const userConnections = new Map();
+
 wss.on("connection", (e) => {
   connections.add(e),
     console.log("WebSocket client connected"),
@@ -747,7 +758,55 @@ wss.on("connection", (e) => {
           // Received a "ping" message from the client, respond with a "pong"
           const t = { msg: "pong" };
           e.send(JSON.stringify(t));
-        } else if (s.action === "getNotifications") {
+
+        }
+        else if(s.action==="getFriends"){
+          const { userId } = s.data;
+         
+            try {
+              // Find the user with the specified userId
+              const user = await User.findOne({ email: userId });
+          
+              if (!user) {
+                return res.status(404).json({ message: "User not found" });
+              }
+          
+              // Get the list of friend emails
+              const friendEmails = user.friends.map((friend) => friend.email);
+          
+              // Find the details of each friend using their email addresses
+              const friendDetails = await User.find({ email: { $in: friendEmails } });
+          
+              // Fetch the last message for each friend
+              const messages = await Promise.all(
+                friendDetails.map(async (friend) => {
+                  const lastMessage = await PersonalMessage
+                  .find({
+                    $or: [
+                      { senderId: userId, recepientId: friend.email },
+                      { senderId: friend.email, recepientId: userId },
+                    ],
+                  })
+                  .sort({ timeStamp: -1 }) // Sort by timestamp in descending order
+                  .limit(1); // Limit the result to only one message
+                
+                    // console.log(lastMessage);
+                  return {
+                    ...friend.toObject(),
+                    lastMessage: lastMessage, // Assuming lastMessage is the message itself
+                  };
+                })
+              );      
+              // Return the details of friends along with their last messages to the frontend
+              // res.json({ friends: messages });
+              e.send(JSON.stringify({friends: messages}))
+            } catch (error) {
+              console.error("Error fetching user friends:", error);
+              res.status(500).json({ message: "Internal server error" });
+            }
+
+        }
+        else if (s.action === "getNotifications") {
           // Handle the 'getNotifications' action here
           const { recipientEmail } = s.data;
           // console.log("ALIVE REQ "+ recipientEmail);
@@ -757,7 +816,7 @@ wss.on("connection", (e) => {
           });
 
           try {
-            // Fetch notifications from your database (similar to 'getMessages')
+  
             const notifications = await Notification.find({
               recipient: recipientEmail,
               read: false,
@@ -796,12 +855,19 @@ wss.on("connection", (e) => {
             // }
             // console.log('message sent!');
             // Broadcast the message to all connected clients
-            wss.clients.forEach((client) => {
-              // console.log(client);
-              if (client !== e && client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(newMessage));
-              }
-            });
+            if (receiverConnection && receiverConnection.readyState === WebSocket.OPEN) {
+              receiverConnection.send(JSON.stringify(newMessage));
+              await PersonalMessage.updateOne({ _id: newMessage._id }, { $set: { read: true } });
+            }
+            // wss.clients.forEach((client) => {
+            //   // console.log(client);
+            //   if (client !== e && client.readyState === WebSocket.OPEN) {
+            //     client.send(JSON.stringify(newMessage));
+            //     newMessage = await PersonalMessage.updateOne(
+            //       { $set: { read: true } }
+            //     )
+            //   }
+            // });
 
             const messageCount = await PersonalMessage.countDocuments({
               senderId,
@@ -844,7 +910,16 @@ wss.on("connection", (e) => {
         }
         else if (s.action === "getMessages") {
           const { senderEmail, recipientEmail } = s.data;
-
+          const updateResult = await PersonalMessage.updateMany(
+            {
+              $or: [
+                { senderId: senderEmail, recepientId: recipientEmail },
+              { senderId: recipientEmail, recepientId: senderEmail },
+              ],
+              read: false // Only mark unread messages as read
+            },
+            { $set: { read: true } }
+          );
           const messages = await PersonalMessage.find({
             $or: [
               { senderId: senderEmail, recepientId: recipientEmail },
@@ -974,6 +1049,19 @@ wss.on("connection", (e) => {
       }
     } catch (error) {
       res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+  app.put("/messages/mark-all-read/:user1/:user2", async (req, res) => {
+    try {
+      const { user1, user2 } = req.params;
+  
+      // Update all unread messages between user1 and user2 to set their 'read' status as 'true'
+      
+  
+      res.json({ message: "All unread messages between users marked as read" });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
   app.post("/unblockuser", async (req, res) => {
@@ -1167,13 +1255,69 @@ app.post("/buyitem", async (req, res) => {
       
 
       if (!shopItem) {
-        throw new Error("Shop item not found");
+        throw new Error("Shop item noot found");
       }
 
       if (type === "badge") {
+        
         user.badge = shopItem.id;
-      } else if (type === "chatcolor") {
+    
+        try {
+            const cus = await Custom.findOne({ userid: userid }).session(session);
+    
+            if (cus) {
+                cus.badges.push(shopItem.id);
+                await cus.save();
+            } else {
+                const ap = {
+                    userid: userid,
+                    badges: [shopItem.id],
+                    colors: [],
+                };
+    
+                const cux = new Custom(ap);
+                await cux.save();
+               
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            // Handle the error as needed (log, throw, etc.)
+        }
+    }
+    
+      
+      
+      else if (type === "chatcolor") {
+        console.log("in color");
         user.chatcolor = shopItem.id;
+        try {
+          const cusx = await Custom.findOne({ userid: userid }).session(session);
+  
+          if (cusx) {
+              cusx.colors.push(shopItem.id);
+              await cusx.save();
+              console.log("ALL SET COLOR xx");
+          } else {
+              const apx = {
+                  userid: userid,
+                  badges: [],
+                  colors: [shopItem.id],
+              };
+  
+              const cuxx = new Custom(apx);
+              await cuxx.save();
+              console.log("ALL SET COLOR");
+          }
+
+
+      } catch (error) {
+          console.error("Error:", error);
+          // Handle the error as needed (log, throw, etc.)
+      }
+
+      
+
+
       } else if (type === "namecolor") {
         user.namecolor = shopItem.id;
       } else if (type === "vip2") {
@@ -1185,8 +1329,9 @@ app.post("/buyitem", async (req, res) => {
         // Assuming shopItem contains vip1, vip2, vip3 properties
         user.premium = shopItem.type;
       }
-
+    
       user.balance -= price;
+    
       await user.save();
       var newbuying = {};
       if (duration == "1 Month") {
@@ -1610,6 +1755,27 @@ app.post("/warning-notifications", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+app.post("/loadcustom", async (e, o) => {
+
+  const ua=e.body.email;
+  const s = await mongoose.startSession();
+  s.startTransaction();
+  try {
+    const e = await Custom
+      .aggregate([{ $match: { userid: ua } }, { $project: { _id: 0 } }])
+      .session(s);
+    await s.commitTransaction(),s
+      s.endSession(),
+      o.json(e[0]);
+      // console.log("BADGES SENT");
+  } catch (e) {
+    await s.abortTransaction(),
+      s.endSession(),
+      console.error(e),
+      o.status(500).json({ message: "An error occurred" });
+  }
+}),
+
 app.post("/notifications", async (req, res) => {
   try {
     const { sender: s, recipient: r, message: t, type: a } = req.body;
@@ -1772,30 +1938,8 @@ app.post("/addfriend", async (e, o) => {
         o.status(500).json({ error: "Internal server error" });
     }
   }),
-  app.get("/users/:userId/friends", async (req, res) => {
-    try {
-      const userId = req.params.userId;
 
-      // Find the user with the specified userId
-      const user = await User.findOne({ email: userId });
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Get the list of friend emails
-      const friendEmails = user.friends.map((friend) => friend.email);
-
-      // Find the details of each friend using their email addresses
-      const friendDetails = await User.find({ email: { $in: friendEmails } });
-
-      // Return the details of friends to the frontend
-      res.json({ friends: friendDetails });
-    } catch (error) {
-      console.error("Error fetching user friends:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
+  
 
 app.post("/changecolor", async (req, res) => {
   const { user, hex } = req.body.det;
@@ -2088,6 +2232,26 @@ app.post("/createroom", async (e, res) => {
       s.endSession();
     }
   }),
+  //endpoint to fetch the messages between two users in the chatRoom
+app.get("/messages/:senderId/:recepientId", async (req, res) => {
+  try {
+    const { senderId, recepientId } = req.params;
+    console.log(senderId, recepientId);
+
+    const messages = await PersonalMessage.find({
+      $or: [
+        { senderId: senderId, recepientId: recepientId },
+        { senderId: recepientId, recepientId: senderId },
+      ],
+    }).sort({ timestamp: 1 });
+
+    res.json(messages);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
   app.post("/deleteroom", async (e, o) => {
     const { roomid: s } = e.body;
     try {
