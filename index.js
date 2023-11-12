@@ -54,6 +54,29 @@ const bcrypt = require("bcrypt");
 //     console.error("Error updating documents:", err);
 //     // Handle the error
 //   });
+async function deletePerMessages(userId){
+  // app.delete("/messages/delete/:userId", async (req, res) => {
+    
+  
+    try {
+      // Delete all messages where the sender or recipient ID matches the provided userId
+      const deleteResult = await PersonalMessage.deleteMany({
+        $or: [
+          { senderId: userId },
+          { recepientId: userId }
+        ]
+      });
+  
+      // res.json({ message: "All messages of the user deleted" });
+      // console.log('msgs deleted');
+    } catch (error) {
+      console.error("Error deleting messages:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  // });
+  
+}
+
 
 async function deleteCoordinates(deleteemail) {
   const session = await mongoose.startSession();
@@ -141,6 +164,29 @@ async function mergedates(p,i) {
 
 
 }
+
+async function removeUserFromFriends(userEmail) {
+  try {
+    // Find all users where the provided email is in their friends list
+    const usersWithFriend = await User.find({ "friends.email": userEmail });
+
+    // Remove the user's email from each of their friends' lists
+    const promises = usersWithFriend.map(async user => {
+      user.friends = user.friends.filter(friend => friend.email !== userEmail);
+      await user.save();
+    });
+
+    await Promise.all(promises);
+    
+    // console.log(`Removed user with email ${userEmail} from friends' lists.`);
+    return true;
+  } catch (error) {
+    console.error("Error removing user from friends' lists:", error);
+    throw error;
+  }
+}
+
+
 
 
 async function deleteMessages(userToBeDeleted) {
@@ -2374,7 +2420,8 @@ app.post("/removeprofilepic", async (e, o) => {
         // console.log(User not found in mods);
         // res.status(404).send('User not found in mods`);
       }
-
+      removeUserFromFriends(email);
+      deletePerMessages(email);
       const result = await deleteMessages(email);
 
       deleteCoordinates(email);
