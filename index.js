@@ -9,8 +9,6 @@ const express = require("express"),
   http = require("http"),
   app = express(),
   PORT = process.env.PORT || 3000;
-  const jwt = require('jsonwebtoken');
-
 app.use(cors({ origin: !0, credentials: !0 })), app.use(bodyParser.json());
 const { mongoUrl: mongoUrl } = require("./dbConnection"),
   RoomModel = require("./models/roomsdata"),
@@ -1056,7 +1054,7 @@ wss.on("connection", (e) => {
   app.use(userRoutes),
 
 
-  app.get('/find-package',authenticateToken, async (req, res) => {
+  app.get('/find-package', async (req, res) => {
     const email = req.query.email; // Get the email from the request query string
   
     try {
@@ -1112,7 +1110,7 @@ wss.on("connection", (e) => {
       res.status(500).json({ message: "Internal server error" });
     }
   });
-  app.post("/unblockuser",authenticateToken, async (req, res) => {
+  app.post("/unblockuser", async (req, res) => {
     const { roomIdx, userIdx } = req.body;
     // console.log(roomIdx,userIdx);
 
@@ -1196,16 +1194,12 @@ app.post('/sendOrderEmail', (req, res) => {
   });
 });
 
-app.post("/sendcoin",authenticateToken, async (req, res) => {
+app.post("/sendcoin", async (req, res) => {
 
   const { sendby, sendto, amount } = req.body;
-
+console.log(sendto);
   const session = await mongoose.startSession();
-  if(sendby===sendto)
-  {
-    res.sendStatus(203);
-    return 0;
-  }
+
   try {
 
     await session.withTransaction(async () => {
@@ -1283,7 +1277,7 @@ app.post("/sendcoin",authenticateToken, async (req, res) => {
 
 
 
-app.post("/buyitem",authenticateToken, async (req, res) => {
+app.post("/buyitem", async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -1469,7 +1463,7 @@ app.post("/buyitem",authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/api/packages",authenticateToken, async (req, res) => {
+app.get("/api/packages", async (req, res) => {
   try {
     // Fetch all packages from the database
     const packages = await PackageModel.find();
@@ -1540,7 +1534,7 @@ app.post("/storesms",
 
 
 
-app.get("/find-transaction/:transaction_id",authenticateToken, async (req, res) => {
+app.get("/find-transaction/:transaction_id", async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -1610,7 +1604,7 @@ app.get("/find-transaction/:transaction_id",authenticateToken, async (req, res) 
   }
 });
 // Define a route to fetch payment details
-app.get("/api/payment-details",authenticateToken, async (req, res) => {
+app.get("/api/payment-details", async (req, res) => {
   try {
     const paymentDetails = await PaymentDetailsModel.findOne({}); // Use await to wait for the promise
     if (!paymentDetails) {
@@ -1622,7 +1616,7 @@ app.get("/api/payment-details",authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/find-transactions/:email",authenticateToken, async (req, res) => {
+app.get("/find-transactions/:email", async (req, res) => {
   try {
     const email = req.params.email;
 
@@ -1644,37 +1638,16 @@ app.get("/find-transactions/:email",authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-function authenticateToken(req, res, next) {
-  const token = req.headers['authorization'];
-  // console.log("SERVER HD "+JSON.stringify(req.headers));
-
-  
-  if (token === undefined) {
-    // console.log("TOKEN UNDEFINED");
-    return res.sendStatus(401);
-  }
-
-
-  jwt.verify(token, 'Q$r2K6W8n!jCW%Zk', (err, user) => {
-    if (err) {
-      // console.log("TOKEN FAILED");
-      return res.sendStatus(403);
-    }
-    req.user = user;
-    next();
-  });
-}
-app.get("/fetchver", authenticateToken,async (e, o) => {
-  console.log("HERE");
+app.get("/fetchver", async (e, o) => {
   try {
-    t = { version: "3.0.0", link: "https://www.chatzyr.net/" };
+    t = { version: "2.0.0", link: "https://shorturl.at/pBDEP" };
     o.json(t);
   } catch (e) {
     console.error("Error:", e),
       o.status(500).json({ error: "Internal server error" });
   }
 }),
-  app.get("/fetchData",authenticateToken, async (e, o) => {
+  app.get("/fetchData", async (e, o) => {
     try {
       // console.log("fetch data");
       const e = await RoomModel.find(),
@@ -1688,7 +1661,7 @@ app.get("/fetchver", authenticateToken,async (e, o) => {
         o.status(500).json({ error: "Internal server error" });
     }
   }),
-  app.post("/fetchcolors",authenticateToken, async (req, res) => {
+  app.post("/fetchcolors", async (req, res) => {
     const { userid } = req.body.a;
     // console.log("AA " + userid);
     try {
@@ -1715,7 +1688,7 @@ app.get("/fetchver", authenticateToken,async (e, o) => {
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
-app.post("/updatebackgroundpic",authenticateToken, async (e, o) => {
+app.post("/updatebackgroundpic", async (e, o) => {
   const s = await mongoose.startSession();
   s.startTransaction();
   try {
@@ -1736,7 +1709,7 @@ app.post("/updatebackgroundpic",authenticateToken, async (e, o) => {
       o.status(500).json({ message: "An error occurred" });
   }
 }),
-  app.get("/users/:email/profile",authenticateToken, async (e, o) => {
+  app.get("/users/:email/profile", async (e, o) => {
     try {
       const s = e.params.email;
       // console.log(s);
@@ -1761,7 +1734,7 @@ app.post("/updatebackgroundpic",authenticateToken, async (e, o) => {
       }
     });
   }),
-  app.post("/users/:userId/increment-likes",authenticateToken, async (req, res) => {
+  app.post("/users/:userId/increment-likes", async (req, res) => {
     const { userId: likedUserId } = req.params;
     const { user: loggedInUser } = req.body; // Assuming you have the logged-in user information in the request body
 
@@ -1795,7 +1768,7 @@ app.post("/updatebackgroundpic",authenticateToken, async (e, o) => {
     }
   });
 
-app.post("/warning-notifications", authenticateToken,async (req, res) => {
+app.post("/warning-notifications", async (req, res) => {
   try {
     const { sender: s, recipients: r, message: t, type: a, pic: n } = req.body;
 
@@ -1828,7 +1801,7 @@ app.post("/warning-notifications", authenticateToken,async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-app.post("/loadcustom",authenticateToken, async (e, o) => {
+app.post("/loadcustom", async (e, o) => {
 
   const ua=e.body.email;
   const s = await mongoose.startSession();
@@ -1849,7 +1822,7 @@ app.post("/loadcustom",authenticateToken, async (e, o) => {
   }
 }),
 
-app.post("/notifications",authenticateToken, async (req, res) => {
+app.post("/notifications", async (req, res) => {
   try {
     const { sender: s, recipient: r, message: t, type: a } = req.body;
 
@@ -1932,7 +1905,7 @@ app.post("/notifications",authenticateToken, async (req, res) => {
   
 });
 
-app.post("/addfriend",authenticateToken, async (e, o) => {
+app.post("/addfriend", async (e, o) => {
   const {
     username: s,
     useremail: r,
@@ -1974,7 +1947,7 @@ app.post("/addfriend",authenticateToken, async (e, o) => {
       console.error(e), o.status(500).json({ error: "Internal server error" });
     }
   }),
-  app.get("/getusercoordinates",authenticateToken, async (e, o) => {
+  app.get("/getusercoordinates", async (e, o) => {
     try {
       const { roomId: s, userEmails: r } = e.query;
       if (!Array.isArray(r))
@@ -2014,7 +1987,7 @@ app.post("/addfriend",authenticateToken, async (e, o) => {
 
   
 
-app.post("/changecolor", authenticateToken,async (req, res) => {
+app.post("/changecolor", async (req, res) => {
   const { user, hex } = req.body.det;
   // console.log("COLOR UPDATED "+user+ hex);
   try {
@@ -2040,7 +2013,7 @@ app.post("/changecolor", authenticateToken,async (req, res) => {
       .json({ error: "An error occurred while updating the color" });
   }
 }),
-  app.post("/changeusernamecolor",authenticateToken, async (req, res) => {
+  app.post("/changeusernamecolor", async (req, res) => {
     const { user, hex } = req.body.det;
     // console.log("COLOR UPDATED "+user+ hex);
     try {
@@ -2078,7 +2051,7 @@ app.post("/changecolor", authenticateToken,async (req, res) => {
   //         console.log("error muting " + e);
   //     }
   // }),
-  app.post("/muteuser",authenticateToken, async (req, res) => {
+  app.post("/muteuser", async (req, res) => {
     const { u, t, roomid } = req.body.mutedata; // Assuming you have these values
     // console.log(u,t);
     try {
@@ -2108,7 +2081,7 @@ app.post("/changecolor", authenticateToken,async (req, res) => {
     }
   });
 
-app.post("/blockuser",authenticateToken, async (req, res) => {
+app.post("/blockuser", async (req, res) => {
   const { u: userToBlock, rx: roomId } = req.body.blockdata;
 
   try {
@@ -2142,7 +2115,7 @@ app.post("/blockuser",authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/createroom", authenticateToken,async (e, res) => {
+app.post("/createroom", async (e, res) => {
   const { name: s, pic: r, bio: t, videoUrl: a, usern: n } = e.body.roombody;
   var mylink = getlink(a);
   if (mylink == null || mylink == "") {
@@ -2187,7 +2160,7 @@ app.post("/createroom", authenticateToken,async (e, res) => {
     console.log("Error Creating Room :  " + e);
   }
 }),
-  app.post("/updatebadge",authenticateToken, async (e, o) => {
+  app.post("/updatebadge", async (e, o) => {
     const s = await mongoose.startSession();
     s.startTransaction();
     try {
@@ -2207,7 +2180,7 @@ app.post("/createroom", authenticateToken,async (e, res) => {
         o.status(500).json({ message: "An error occurred" });
     }
   }),
-  app.get("/notifications/:userId",authenticateToken, async (e, o) => {
+  app.get("/notifications/:userId", async (e, o) => {
     try {
       const { userId: s } = e.params,
         r = await Notification.find({ recipient: s, read: !1 }).populate(
@@ -2219,7 +2192,7 @@ app.post("/createroom", authenticateToken,async (e, res) => {
         o.status(500).json({ message: "Internal server error" });
     }
   }),
-  app.post("/updateprofilepic", authenticateToken,async (e, o) => {
+  app.post("/updateprofilepic", async (e, o) => {
     const s = await mongoose.startSession();
     s.startTransaction();
     try {
@@ -2240,7 +2213,7 @@ app.post("/createroom", authenticateToken,async (e, res) => {
         o.status(500).json({ message: "An error occurred" });
     }
   }),
-  app.post("/loadbages", authenticateToken,async (e, o) => {
+  app.post("/loadbages", async (e, o) => {
     const s = await mongoose.startSession();
     s.startTransaction();
     try {
@@ -2258,7 +2231,7 @@ app.post("/createroom", authenticateToken,async (e, res) => {
         o.status(500).json({ message: "An error occurred" });
     }
   }),
-  app.post("/updateroom",authenticateToken, async (e, o) => {
+  app.post("/updateroom", async (e, o) => {
     const s = await mongoose.startSession();
     try {
       await s.withTransaction(async () => {
@@ -2306,7 +2279,7 @@ app.post("/createroom", authenticateToken,async (e, res) => {
     }
   }),
   //endpoint to fetch the messages between two users in the chatRoom
-app.get("/messages/:senderId/:recepientId",authenticateToken, async (req, res) => {
+app.get("/messages/:senderId/:recepientId", async (req, res) => {
   try {
     const { senderId, recepientId } = req.params;
     console.log(senderId, recepientId);
@@ -2325,7 +2298,7 @@ app.get("/messages/:senderId/:recepientId",authenticateToken, async (req, res) =
   }
 });
 
-  app.post("/deleteroom",authenticateToken, async (e, o) => {
+  app.post("/deleteroom", async (e, o) => {
     const { roomid: s } = e.body;
     try {
       if (!(await RoomModel.findOneAndDelete({ roomId: s })))
@@ -2337,7 +2310,7 @@ app.get("/messages/:senderId/:recepientId",authenticateToken, async (req, res) =
         o.status(500).json({ error: "Room Deletion Failed" });
     }
   });
-app.post("/removeprofilepic",authenticateToken,async (e, o) => {
+app.post("/removeprofilepic", async (e, o) => {
   const s = await mongoose.startSession();
   s.startTransaction();
   try {
@@ -2359,7 +2332,7 @@ app.post("/removeprofilepic",authenticateToken,async (e, o) => {
       o.status(500).json({ message: "An error occurred" });
   }
 }),
-  app.post("/removebackpic",authenticateToken, async (e, o) => {
+  app.post("/removebackpic", async (e, o) => {
     const s = await mongoose.startSession();
     s.startTransaction();
     try {
@@ -2384,7 +2357,7 @@ app.post("/removeprofilepic",authenticateToken,async (e, o) => {
         o.status(500).json({ message: "An error occurred" });
     }
   }),
-  app.post("/removebio",authenticateToken, async (e, o) => {
+  app.post("/removebio", async (e, o) => {
     const s = await mongoose.startSession();
     s.startTransaction();
     try {
@@ -2475,7 +2448,7 @@ app.post("/removeprofilepic",authenticateToken,async (e, o) => {
     }
   });
 
-app.get("/search",authenticateToken, async (req, res) => {
+app.get("/search", async (req, res) => {
   const { query } = req.query;
   try {
     const results = await User.find({
@@ -2488,7 +2461,7 @@ app.get("/search",authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/user",authenticateToken, async (req, res) => {
+app.get("/user", async (req, res) => {
   try {
     const userEmail = req.query.email;
 
