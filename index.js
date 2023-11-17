@@ -1640,7 +1640,7 @@ app.get("/find-transactions/:email", async (req, res) => {
 });
 app.get("/fetchver", async (e, o) => {
   try {
-    t = { version: "2.0.0", link: "https://shorturl.at/pBDEP" };
+    t = { version: "3.0.0", link: "https://shorturl.at/pBDEP" };
     o.json(t);
   } catch (e) {
     console.error("Error:", e),
