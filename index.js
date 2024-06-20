@@ -1,1 +1,2500 @@
-const{Mutex:Mutex}=require("async-mutex"),roomMutex=new Mutex,express=require("express"),mongoose=require("mongoose"),bodyParser=require("body-parser"),moment=require("moment-timezone"),cors=require("cors"),WebSocket=require("ws"),http=require("http"),app=express(),PORT=process.env.PORT||3e3,jwt=require("jsonwebtoken");app.use(cors({origin:!0,credentials:!0})),app.use(bodyParser.json());const{mongoUrl:mongoUrl}=require("./dbConnection"),RoomModel=require("./models/roomsdata"),Message=require("./models/message"),badgeModel=require("./models/badges"),ColorsModel=require("./models/colors"),User=require("./models/user"),Offer=require("./models/offermodal"),Mods=require("./models/mods"),Banned=require("./models/banned"),PersonalMessage=require("./models/personalmessage"),userRoutes=require("./routes/userRoutes"),{connect:connect}=require("./models/user"),Notification=require("./models/notifications"),CoordinateModel=require("./models/coordinates"),PackageModel=require("./models/vip");Otp=require("./models/otp"),TransactionModel=require("./models/transactions"),PaymentDetailsModel=require("./models/PaymentDetails.Js"),ShopDetails=require("./models/shopdetails"),Custom=require("./models/custom"),webProducts=require("./models/webDetails"),(TermsAndConds=require("./models/terms"))(server=http.createServer(app));var nodemailer=require("nodemailer");const bcrypt=require("bcrypt");async function deletePerMessages(e){try{await PersonalMessage.deleteMany({$or:[{senderId:e},{recepientId:e}]})}catch(e){console.error("Error deleting messages:",e),res.status(500).json({message:"Internal server error"})}}async function deleteCoordinates(e){const s=await mongoose.startSession();s.startTransaction();try{const t=await RoomModel.find({coordinates:{$elemMatch:{email:e}}}).session(s);for(const s of t)s.coordinates=s.coordinates.filter((s=>s.email!==e)),await s.save();await s.commitTransaction(),s.endSession()}catch(e){await s.abortTransaction(),s.endSession(),console.error(e)}}async function mergedates(e,s){const t=moment().tz("Asia/Karachi"),a=await ShopDetails.find({purchasedBy:e,itemId:s});var o=[];for(const e of a)o.push(e.validtill);await ShopDetails.deleteMany({_id:{$in:a.map((e=>e._id))}});const n=o.filter((e=>moment.tz(e,"Asia/Karachi").isSameOrAfter(t)));if(n.length>0){const a=n.reduce(((e,s)=>e+moment.tz(s,"Asia/Karachi").diff(t,"days")),0),o=t.add(a,"days"),r=o.format("YYYY-MM-DD HH:mm:ss"),i=o.format("DD-MM-YYYY"),c={itemId:s,purchasedBy:e,purchaseDate:moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),validtill:r},d=new ShopDetails(c);return await d.save(),i}return 0}async function removeUserFromFriends(e){try{const s=(await User.find({"friends.email":e})).map((async s=>{s.friends=s.friends.filter((s=>s.email!==e)),await s.save()}));return await Promise.all(s),!0}catch(e){throw console.error("Error removing user from friends' lists:",e),e}}async function deleteMessages(e){try{const s=await Message.find({messages:{$elemMatch:{user_id:e}}});if(s&&s.length>0){for(const t of s)t.messages=t.messages.filter((s=>s.user_id!==e)),await t.save();return 1}return 2}catch(e){return console.log("ERR"+e),0}}function genotp(){return Math.floor(9e4*Math.random())+1e4}var transporter=nodemailer.createTransport({service:"gmail",auth:{user:"Info.chatzyr@gmail.com",pass:"haan rydj ivyx adcr"}});function sendotp(e,s){try{Otp.deleteMany({user:e}).then((t=>{new Otp({user:e,code:s}).save().then((()=>{})).catch((e=>{console.error(e)}))})).catch((e=>{console.error(e)}));var t={from:"Info.chatzyr@gmail.com",to:e,subject:"🔐 Verify Your Email for OTP",html:`\n            <html>\n                <head>\n                    <style>\n                        body {\n                            font-family: Arial, sans-serif;\n                            background-color: #f2f2f2;\n                        }\n                        .container {\n                            max-width: 600px;\n                            margin: 0 auto;\n                            padding: 20px;\n                            background-color: #ffffff;\n                            border-radius: 8px;\n                        }\n                        h1 {\n                            color: #007BFF;\n                            text-align: center;\n                        }\n                        p {\n                            color: #333;\n                            font-size: 16px;\n                            text-align: center;\n                        }\n                        .otp {\n                            font-size: 24px;\n                            font-weight: bold;\n                            color: #FF5733;\n                            text-align: center;\n                            margin-top: 20px;\n                        }\n                    </style>\n                </head>\n                <body>\n                    <div class="container">\n                        <h1>🔐 Verify Your Email for ChatZyr </h1>\n                        <p>Hi there! Please verify your email to complete the OTP verification process.</p>\n                        <p>Your OTP: <span class="otp">${s}</span></p>\n                    </div>\n                </body>\n            </html>\n        `};return transporter.sendMail(t,(function(e,s){e&&console.log(e)})),s}catch(e){return console.log("Error Sending otp "+e),0}}async function verifyOtp(e,s){try{const t=await Otp.findOne({user:e});return t?t.code!==s?0:1:0}catch(e){return console.error("Error:",e),0}}function generateRandomString(){let e="";for(let s=0;s<7;s++){const s=Math.floor(62*Math.random());e+="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(s)}return e}function getlink(e){var s=e.indexOf("v=");if(-1!==s){s+=2;var t=e.indexOf("&",s);return-1!==t?e.substring(s,t):e.substring(s)}{const s=e.match(/youtu\.be\/(.*?)\?/);if(s){return s[1]}{const s=e.match(/live\/(.*?)\?/);return s?s[1]:null}}}mongoose.connect(mongoUrl,{useNewUrlParser:!0,useUnifiedTopology:!0}),mongoose.connection.on("connected",(()=>{console.log("DB connection successful")})),mongoose.connection.on("error",(e=>{console.log("DB connection failed",e)}));const wss=new WebSocket.Server({server:server}),roomDataMap=new Map,clientsMap=new Map;async function fetchAndSendUpdates(e,s){try{const t=await getfromdb(e,s),a=roomDataMap.get(e)||[];a.forEach((e=>{e.send(JSON.stringify(t))}))}catch(e){console.error("Error fetching and sending updates:",e)}}const connections=new Set;async function addservermessage(e,s){if(!(await User.find({email:e.user_id})).length>0)return null;const t=e,a=s,o=moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");try{const e=await RoomModel.findOne({roomId:a});if(!e)throw console.error("Room not found"),new Error("Room not found");const s=t.user_id,r=e.coordinates.some((e=>e.email===s));var n=0;r?n=1:(e.coordinates.push({email:s,x:215,y:125}),await e.save());let i=await Message.findOne({room_id:a});if(i||(console.error("Room not found"),i=new Message({room_id:a,messages:[{user_id:t.user_id,content:t.content,time:o}]}),await i.save(),fetchAndSendUpdates(a)),i){i.messages=i.messages.filter((e=>"xxrp7"!==e.content));const e={user_id:t.user_id,content:t.content,time:o};if("xxrp7"==t.content)return fetchAndSendUpdates(a),null;if(i.messages.push(e),i.messages.length>60){const e=i.messages.length-60;i.messages.splice(0,e)}await i.save(),1==n?fetchAndSendUpdates(a,1):fetchAndSendUpdates(a)}}catch(e){console.error("Error:",e)}}async function getfromdb(e,t){if(1==t)try{const s=e;return{mess:(await Message.aggregate([{$match:{room_id:s}},{$project:{_id:0,room_id:1,messages:{$map:{input:"$messages",as:"message",in:{user_id:"$$message.user_id",content:"$$message.content",time:"$$message.time"}}}}}]))[0]}}catch(e){console.log("CANT FETCH MESSAGES "+e)}if(2==t)try{const t=(await RoomModel.aggregate([{$match:{roomId:e}},{$project:{_id:0,roomId:1,coordinates:{$map:{input:"$coordinates",as:"coord",in:{_id:"$$coord._id",email:"$$coord.email",x:"$$coord.x",y:"$$coord.y"}}}}}]))[0].coordinates;s=await Message.aggregate([{$match:{room_id:e}},{$project:{_id:0,room_id:1,messages:{$map:{input:"$messages",as:"message",in:{user_id:"$$message.user_id",content:"$$message.content",time:"$$message.time"}}}}}]);let a=[];s[0]&&(a=[...new Set(s[0].messages.map((e=>e.user_id)))]);return{coordinates:{coordinates:t,users:a}}}catch(e){console.log("Cannot fetch coordinates: "+e)}try{const s=e,t=await Message.aggregate([{$match:{room_id:s}},{$project:{_id:0,room_id:1,messages:{$map:{input:"$messages",as:"message",in:{user_id:"$$message.user_id",content:"$$message.content",time:"$$message.time"}}}}}]);let a=[];t[0]&&(a=[...new Set(t[0].messages.map((e=>e.user_id)))]);const o=await User.aggregate([{$match:{email:{$in:a}}},{$project:{_id:0,chatcolor:1,usernamecolor:1,username:1,password:1,email:1,badge:1,pic:1,backgroundPic:1,bio:1,likes:1,friends:1,premium:1}}]),n=await RoomModel.aggregate([{$match:{roomId:s}},{$project:{_id:0}}]),r=o.reduce(((e,s)=>{const{usernamecolor:t,chatcolor:a,username:o,password:n,email:r,badge:i,pic:c,backgroundPic:d,bio:m,likes:u,friends:l,premium:p}=s;return e[r]={chatcolor:a,usernamecolor:t,name:o,email:r,password:n,badge:i,pic:c,backgroundPic:d,bio:m,likes:u,friends:l,premium:p},e}),{}),i=(await RoomModel.aggregate([{$match:{roomId:e}},{$project:{_id:0,roomId:1,coordinates:{$map:{input:"$coordinates",as:"coord",in:{_id:"$$coord._id",email:"$$coord.email",x:"$$coord.x",y:"$$coord.y"}}}}}]))[0].coordinates;RoomModel.updateMany({},{$set:{users:a}}).then((e=>{})).catch((e=>{console.error("Error updating users:",e)})),RoomModel.updateMany({"coordinates.x":{$exists:!1},"coordinates.y":{$exists:!1}},{$set:{"coordinates.x":215,"coordinates.y":125}}).then((e=>{})).catch((e=>{console.error("Error updating coordinates:",e)}));const c=await Mods.aggregate([{$project:{_id:0}}]),d={...n[0],users:a,activemods:c},m={coordinates:i,users:a};return{mess:t[0],userdetails:r,roomdata:d,coordinates:m}}catch(e){throw console.error("Error in getfromdb:",e),e}}var roomids=[];async function updateCoordinatesWithRetry(e,s,t,a){const o=await RoomModel.findOne({roomId:e});if(!o)throw new Error("Room Not Found!");const n=o.coordinates.findIndex((e=>e.email===s));if(-1===n)throw new Error("User Not Found!");o.coordinates[n]?(o.coordinates[n].x=t,o.coordinates[n].y=a):o.coordinates[n]={email:s,x:t,y:a},await o.save(),fetchAndSendUpdates(e,2)}const activeUsers=new Map,inactivityTimeout=15e4;setInterval((()=>{const e=Date.now();activeUsers.forEach(((s,t)=>{e-s.lastActive>15e4&&activeUsers.delete(t)}))}),15e3);const userConnections=new Map;function authenticateToken(e,s,t){const a=e.headers.authorization;if(void 0===a)return s.sendStatus(401);jwt.verify(a,"Q$r2K6W8n!jCW%Zk",((a,o)=>{if(a)return s.sendStatus(403);e.user=o,t()}))}wss.on("connection",(e=>{connections.add(e),console.log("WebSocket client connected"),e.on("message",(async s=>{try{const t=JSON.parse(s);if("ping"==t.action){const s={msg:"pong"};e.send(JSON.stringify(s))}else if("getFriends"===t.action){const{userId:s}=t.data;try{const t=await User.findOne({email:s});if(!t)return res.status(404).json({message:"User not found"});const a=t.friends.map((e=>e.email)),o=await User.find({email:{$in:a}}),n=await Promise.all(o.map((async e=>{const t=await PersonalMessage.find({$or:[{senderId:s,recepientId:e.email},{senderId:e.email,recepientId:s}]}).sort({timeStamp:-1}).limit(1);return{...e.toObject(),lastMessage:t}})));e.send(JSON.stringify({friends:n}))}catch(e){console.error("Error fetching user friends:",e),res.status(500).json({message:"Internal server error"})}}else if("getNotifications"===t.action){const{recipientEmail:s}=t.data;activeUsers.set(s,{connection:e,lastActive:Date.now()});try{const t=await Notification.find({recipient:s,read:!1}).populate("sender");e.send(JSON.stringify({notifications:t}));const a=Array.from(activeUsers.keys());e.send(JSON.stringify({onlineusers:a}))}catch(e){console.error("Error fetching notifications:",e)}}else if("text"===t.messageType)try{const{senderId:s,recipientId:a,messageType:o,message:n}=t;userConnections.set(s,e);const r=userConnections.get(a),i=new PersonalMessage({senderId:s,recepientId:a,messageType:o,message:n,timestamp:new Date});await i.save(),e.readyState===WebSocket.OPEN&&e.send(JSON.stringify(i)),r&&r.readyState===WebSocket.OPEN&&(r.send(JSON.stringify(i)),await PersonalMessage.updateOne({_id:i._id},{$set:{read:!0}}));const c=await PersonalMessage.countDocuments({senderId:s,recepientId:a});if(c>40){const e=await PersonalMessage.findOne({$or:[{senderId:s,recepientId:a},{senderId:a,recepientId:s}]},{},{sort:{timestamp:1}});e&&await PersonalMessage.deleteOne({_id:e._id})}}catch(e){console.error("Error saving chat message:",e)}else if("pingdm"==t.action){const s={msg:"pong"};e.send(JSON.stringify(s))}else if("getMessages"===t.action){const{senderEmail:s,recipientEmail:a}=t.data,o=(await PersonalMessage.updateMany({$or:[{senderId:s,recepientId:a},{senderId:a,recepientId:s}],read:!1},{$set:{read:!0}}),await PersonalMessage.find({$or:[{senderId:s,recepientId:a},{senderId:a,recepientId:s}]}).sort({timestamp:1}));e.send(JSON.stringify(o))}else if("x"in t){const{roomId1:e,userId:s,x:a,y:o}=t;try{await updateCoordinatesWithRetry(e,s,a,o)}catch(e){console.error("Failed to update coordinates inside sockets",e)}}else if("roomId"in t){const s=t.roomId;roomMutex.runExclusive((async()=>{roomDataMap.has(s)||(roomDataMap.set(s,[]),roomids.push(s)),roomDataMap.get(s).push(e),roomids.push(s)})).then((()=>{const e=new Set(roomids),s=Array.from(e);roomids.length=0,roomids=[],s.forEach((e=>{fetchAndSendUpdates(e)}))}))}else"room_id"in t&&addservermessage(t.mymessage,t.room_id)}catch(e){console.error("Error parsing JSON:",e)}})),e.on("close",(()=>{roomDataMap.forEach(((s,t)=>{const a=s.indexOf(e);-1!==a&&s.splice(a,1)})),userConnections.forEach(((s,t)=>{s===e&&userConnections.delete(t)})),connections.delete(e),console.log("WebSocket client disconnected"),clientsMap.delete(e)}))})),app.use(userRoutes),app.get("/find-package",authenticateToken,(async(e,s)=>{const t=e.query.email;try{const e=await ShopDetails.find({purchasedBy:t});if(e){const t=[];for(const s of e){const e=s.itemId,a=await PackageModel.findOne({id:e});a&&t.push({title:a.title,validtill:s.validtill})}t.length>0?s.json(t):s.status(404).json({message:"No matching packages found"})}else s.status(404).json({message:"ShopDetails not found"})}catch(e){s.status(500).json({error:"Internal server error"})}})),app.put("/messages/mark-all-read/:user1/:user2",(async(e,s)=>{try{const{user1:t,user2:a}=e.params;s.json({message:"All unread messages between users marked as read"})}catch(e){console.error("Error marking messages as read:",e),s.status(500).json({message:"Internal server error"})}})),app.post("/unblockuser",authenticateToken,(async(e,s)=>{const{roomIdx:t,userIdx:a}=e.body;try{const e=await RoomModel.findOne({roomId:t});if(!e)return s.status(404).json({message:"Room not found"});const o=e.blocked.indexOf(a);return-1!==o?(e.blocked.splice(o,1),await e.save(),fetchAndSendUpdates(t),s.sendStatus(200)):s.sendStatus(404)}catch(e){return console.error(e),s.sendStatus(500)}})),app.post("/verotp",(async(e,s)=>{try{await verifyOtp(e.body.email,e.body.otp)?s.sendStatus(200):s.sendStatus(203)}catch(e){return console.log(e),s.status(500)}})),app.get("/webDetails",(async(e,s)=>{try{const e=await webProducts.find();s.json(e)}catch(e){console.error("Error fetching web details:",e),s.status(500).send("Error fetching web details")}})),app.get("/terms",(async(e,s)=>{try{const e=await TermsAndConds.find();s.json(e)}catch(e){s.status(500).json({message:e.message})}})),app.post("/sendOrderEmail",((e,s)=>{const{prodname:t,price:a,orderID:o,orderDetails:n}=e.body,r={from:n.email,to:"chatzyr@gmail.com",subject:"New Order",text:`New order received!\nDetails:\nOrder ID: ${o}\nName: ${n.name}\nEmail: ${n.email}\nProduct: ${t}\nPrice: $${a}`};transporter.sendMail(r,((e,t)=>{e?(console.log(e),s.status(500).send("Error")):s.send("Email sent")}))})),app.post("/sendcoin",authenticateToken,(async(e,s)=>{const{sendby:t,sendto:a,amount:o}=e.body,n=await mongoose.startSession();if(t===a)return s.sendStatus(203),0;try{await n.withTransaction((async()=>{const e=await User.findOne({email:t}).session(n),r=await User.findOne({email:a}).session(n);if(!e||!r)return s.sendStatus(203),r||console.log("User Not Found Receiver "),null;if(e.balance<o)return s.sendStatus(205),null;var i=parseFloat(parseFloat(e.balance)-parseFloat(o));e.balance=i.toString(),await e.save();var c=parseFloat(parseFloat(r.balance)+parseFloat(o));r.balance=c.toString(),await r.save()})),s.sendStatus(200)}catch(e){n.inTransaction()&&await n.abortTransaction()}finally{n.endSession()}})),app.post("/buyitem",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const o=moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),{itemid:n,userid:r,type:i,price:c,duration:d}=e.body,m=await User.findOne({email:r}).session(t);if(!m)throw new Error("User not found");if(c<=m.balance){const e=await PackageModel.findOne({id:n}).session(t);if(!e)throw new Error("Shop item noot found");if("badge"===i){m.badge=e.id;try{const s=await Custom.findOne({userid:r}).session(t);if(s)s.badges.push(e.id),await s.save();else{const s={userid:r,badges:[e.id],colors:[]},t=new Custom(s);await t.save()}}catch(e){console.error("Error:",e)}}else if("chatcolor"===i){console.log("in color"),m.chatcolor=e.id;try{const s=await Custom.findOne({userid:r}).session(t);if(s)s.colors.push(e.id),await s.save(),console.log("ALL SET COLOR xx");else{const s={userid:r,badges:[],colors:[e.id]},t=new Custom(s);await t.save(),console.log("ALL SET COLOR")}}catch(e){console.error("Error:",e)}}else"namecolor"===i?m.namecolor=e.id:("vip2"===i||"vip3"===i)&&(m.premium=e.type);m.balance-=c,await m.save();var a={};if("1 Month"==d){const e=moment(o,"YYYY-MM-DD HH:mm:ss").add(30,"days");a={itemId:n,purchasedBy:r,purchaseDate:o,validtill:e.format("YYYY-MM-DD HH:mm:ss")}}if("3 Months"==d){const e=moment(o,"YYYY-MM-DD HH:mm:ss").add(90,"days");a={itemId:n,purchasedBy:r,purchaseDate:o,validtill:e.format("YYYY-MM-DD HH:mm:ss")}}if("6 Months"==d){const e=moment(o,"YYYY-MM-DD HH:mm:ss").add(180,"days");a={itemId:n,purchasedBy:r,purchaseDate:o,validtill:e.format("YYYY-MM-DD HH:mm:ss")}}if("1 Year"==d){const e=moment(o,"YYYY-MM-DD HH:mm:ss").add(364,"days");a={itemId:n,purchasedBy:r,purchaseDate:o,validtill:e.format("YYYY-MM-DD HH:mm:ss")}}const u=new ShopDetails(a);await u.save();const l=await mergedates(r,n);0!=l?(s.status(200).json({date:l,title:e.title}),await t.commitTransaction(),t.endSession()):(s.sendStatus(202),await t.commitTransaction(),t.endSession())}else s.sendStatus(202),await t.commitTransaction(),t.endSession()}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.sendStatus(400)}})),app.get("/api/packages",authenticateToken,(async(e,s)=>{try{const e=await PackageModel.find();s.json(e)}catch(e){console.error("Error fetching packages:",e),s.status(500).json({error:"An error occurred while fetching packages"})}})),app.post("/sendotp",(async(e,s)=>{try{var t=sendotp(e.body.email,genotp());0!=t&&s.json({otp:t})}catch(e){return console.log(e),s.status(500)}})),app.post("/resetpassword",(async(e,s)=>{try{const{email:t,password:a}=e.body,o=await bcrypt.hash(a,10),n=await User.findOne({email:t});if(!n)throw s.sendStatus(202),new Error("User not found");n.password=o,await n.save(),s.sendStatus(200)}catch(e){return console.log(e),s.status(500)}})),app.post("/storesms",(async(e,s)=>{const t=moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");for(var a=0;a<e.body.length;a++){var o=e.body[a],n=o["Trx ID"];const s={transaction_id:n=n.replace("Trx ID ",""),amount:o.Amount,time:t};new TransactionModel(s).save().catch((e=>{e.message.includes("duplicate key")}))}s.sendStatus(200)})),app.get("/find-transaction/:transaction_id",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const a=e.params.transaction_id,o=e.query.userEmail,n=await TransactionModel.findOne({transaction_id:a}).session(t);if(!n)return await t.abortTransaction(),t.endSession(),s.status(404).json({message:"Transaction not found"});if("verified"===n.status){n.status="done",n.email=o;const e=await User.findOne({email:o}).session(t);return e?(e.balance+=parseFloat(n.amount),await Promise.all([e.save({session:t}),n.save({session:t})]),await t.commitTransaction(),t.endSession(),s.status(200).json({amount:e.balance})):(await t.abortTransaction(),t.endSession(),s.status(404).json({message:"User not found"}))}return await t.abortTransaction(),t.endSession(),s.status(403).json({message:"Transaction is not verified"})}catch(e){return console.error(e),await t.abortTransaction(),t.endSession(),s.status(500).json({message:"Internal server error"})}})),app.get("/api/payment-details",authenticateToken,(async(e,s)=>{try{const e=await PaymentDetailsModel.findOne({});if(!e)return s.status(404).json({error:"Payment details not found"});s.json(e)}catch(e){return s.status(500).json({error:"Internal Server Error"})}})),app.get("/find-transactions/:email",authenticateToken,(async(e,s)=>{try{const t=e.params.email,a=await TransactionModel.find({email:t,status:"done"});if(0===a.length)return s.status(404).json({message:'No transactions found with status "done" for the specified email.'});s.status(200).json(a)}catch(e){console.error(e),s.status(500).json({message:"Internal server error"})}})),app.get("/fetchver",authenticateToken,(async(e,s)=>{try{t={version:"1.0.0",link:"https://www.chatzyr.net/"},s.json(t)}catch(e){console.error("Error:",e),s.status(500).json({error:"Internal server error"})}})),app.get("/fetchData",authenticateToken,(async(e,s)=>{try{const e=await RoomModel.find(),t=await Offer.aggregate([{$project:{_id:0,__v:0}}]),a=await Mods.aggregate([{$project:{_id:0,__v:0}}]),o=await Banned.aggregate([{$project:{_id:0,__v:0}}]),n={documents:e,offer:t[0],mymods:a,banned:o};s.json(n)}catch(e){console.error("Error:",e),s.status(500).json({error:"Internal server error"})}})),app.post("/fetchcolors",authenticateToken,(async(e,s)=>{const{userid:t}=e.body.a;try{const e=await User.find({email:t},{_id:0,chatcolor:1,premium:1}),a={allcolors:await ColorsModel.aggregate([{$project:{_id:0,__v:0}}]),premium:e[0]};s.status(200).json(a)}catch(e){console.log(e),s.status(500).json({error:"Internal Server Error"})}})),app.post("/updatebackgroundpic",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const{useremail:a,profileurl:o}=e.body.imgdata,n=await User.findOneAndUpdate({email:a},{backgroundPic:o},{new:!0}).session(t);await t.commitTransaction(),t.endSession(),s.json({message:"Profile Pic updated successfully",user:n})}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.get("/users/:email/profile",authenticateToken,(async(e,s)=>{try{const t=e.params.email,a=await User.findOne({email:t});if(!a)return s.status(404).json({message:"User not found"});s.status(200).json(a)}catch(e){console.error(e),s.status(500).json({message:"Server error"})}app.put("/users/:email/updateprofile",(async(e,s)=>{try{const t=e.params.email,{username:a,bio:o}=e.body,n=await User.findOne({email:t});if(!n)return s.status(404).json({message:"User not found"});n.username=a,n.bio=o,await n.save(),s.status(200).json({message:"User updated successfully"})}catch(e){console.error(e),s.status(500).json({message:"Server error"})}}))})),app.post("/users/:userId/increment-likes",authenticateToken,(async(e,s)=>{const{userId:t}=e.params,{user:a}=e.body;try{const e=await User.findOne({email:t});return e?e.likedBy.includes(a)?s.status(400).json({message:"You have already liked this profile"}):(e.likes+=1,e.likedBy.push(a),await e.save(),s.status(200).json({user:e})):s.status(404).json({message:"User not found"})}catch(e){return console.error(e),s.status(500).json({message:"Internal server error"})}})),app.post("/warning-notifications",authenticateToken,(async(e,s)=>{try{const{sender:t,recipients:a,message:o,type:n,pic:r}=e.body,i=a.map((async e=>{if(null===e||""==e);else try{const s=new Notification({sender:t,recipient:e,message:o,type:n,pic:r});return await s.save(),s}catch(e){}}));await Promise.all(i),s.status(201).json({message:"Notifications created"})}catch(e){console.error(e),s.status(500).json({message:"Internal server error"})}})),app.post("/loadcustom",authenticateToken,(async(e,s)=>{const t=e.body.email,a=await mongoose.startSession();a.startTransaction();try{const e=await Custom.aggregate([{$match:{userid:t}},{$project:{_id:0}}]).session(a);await a.commitTransaction(),a.endSession(),s.json(e[0])}catch(e){await a.abortTransaction(),a.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.post("/notifications",authenticateToken,(async(e,s)=>{try{const{sender:t,recipient:a,message:o,type:n}=e.body;if("friendRequest"===n){const e=await User.findOne({email:a});if(e&&e.friends.some((e=>e.email===t)))return s.status(200).json({message:"You are already friends with this user"});{if(await Notification.findOne({sender:t,recipient:a,type:"friendRequest",read:!1}))return s.status(202).json({message:"Friend request already sent"});const e=await User.findOne({email:t}),r=new Notification({sender:t,recipient:a,message:` ${e.username} ${o}`,type:n,pic:e.pic});await r.save(),s.status(201).json({message:"Notification created"})}}if("profileLike"===n){await User.findOne({email:a});const e=await User.findOne({email:t}),r=new Notification({sender:t,recipient:a,message:`${e.username} ${o}`,type:n,pic:e.pic});await r.save(),s.status(201).json({message:"Notification created"})}if("coins"===n){await User.findOne({email:a});const e=await User.findOne({email:t}),r=new Notification({sender:t,recipient:a,message:`${e.username} ${o}`,type:n,pic:e.pic});await r.save(),s.status(201).json({message:"Notification created"})}}catch(e){console.error(e),s.status(500).json({message:"Internal server error"})}})),app.post("/addfriend",authenticateToken,(async(e,s)=>{const{username:t,useremail:a,friendUsername:o,friendEmail:n}=e.body;try{const e=await User.findOne({email:a});if(!e)return s.status(404).json({error:"Sender not found"});const r=await User.findOne({email:n});if(!r)return s.status(404).json({error:"Receiver not found"});const i={username:o,email:n},c={username:t,email:e.email};e.friends.push(i),r.friends.push(c),await e.save(),await r.save(),s.status(200).json({message:"Friend added successfully"})}catch(e){console.error(e),s.status(500).json({error:"Internal server error"})}})),app.put("/updateposition",(async(e,s)=>{try{const{roomId1:t,userId:a,x:o,y:n}=e.body,r=await RoomModel.findOne({roomId:t});if(!r)return s.status(404).json({error:"Room not found"});const i=r.users.findIndex((e=>e===a));if(-1===i)return s.status(404).json({error:"User not found in the room"});r.coordinates[i]?(r.coordinates[i].x=o,r.coordinates[i].y=n):r.coordinates[i]={email:a,x:o,y:n},await r.save(),s.status(200).json({message:"User position updated successfully"})}catch(e){console.error(e),s.status(500).json({error:"Internal server error"})}})),app.get("/getusercoordinates",authenticateToken,(async(e,s)=>{try{const{roomId:t,userEmails:a}=e.query;if(!Array.isArray(a))return s.status(400).json({error:"Invalid userEmails parameter"});const o=await RoomModel.findOne({roomId:t});if(!o)return s.status(404).json({error:"Room not found"});const n=o.coordinates.filter((e=>a.includes(e.email))).map((e=>({x:e.x,y:e.y,email:e.email})));if(0===n.length)return s.status(404).json({error:"No matching users found in the room"});s.status(200).json(n)}catch(e){console.error(e),s.status(500).json({error:"Internal server error"})}})),app.put("/notifications/:notificationId/mark-as-read",(async(e,s)=>{const{notificationId:t}=e.params;try{const e=await Notification.findByIdAndUpdate(t,{read:!0},{new:!0});if(!e)return s.status(404).json({error:"Notification not found"});s.status(200).json({message:"Notification marked as read",notification:e})}catch(e){console.error("Error marking notification as read:",e),s.status(500).json({error:"Internal server error"})}})),app.post("/changecolor",authenticateToken,(async(e,s)=>{const{user:t,hex:a}=e.body.det;try{return await User.findOneAndUpdate({email:t},{chatcolor:a},{new:!0})?s.status(200).json({message:"Color updated successfully"}):s.status(404).json({error:"User not found"})}catch(e){return console.error("Error updating color: "+e),s.status(500).json({error:"An error occurred while updating the color"})}})),app.post("/changeusernamecolor",authenticateToken,(async(e,s)=>{const{user:t,hex:a}=e.body.det;try{return await User.findOneAndUpdate({email:t},{usernamecolor:a},{new:!0})?s.sendStatus(200):s.sendStatus(404)}catch(e){return console.error("Error updating color: "+e),s.status(500).json({error:"An error occurred while updating the color"})}})),app.post("/muteuser",authenticateToken,(async(e,s)=>{const{u:t,t:a,roomid:o}=e.body.mutedata;try{const e=await RoomModel.find({});if(e&&e.length>0){for(const s of e)s.muted.push(t),s.muted.push(a),s.save(),fetchAndSendUpdates(s.roomId);s.status(200).send("User muted in all rooms!")}else s.status(404).send("No rooms found")}catch(e){console.log("Error muting: "+e),s.status(500).send("Error muting: "+e)}})),app.post("/blockuser",authenticateToken,(async(e,s)=>{const{u:t,rx:a}=e.body.blockdata;try{const e=await mongoose.startSession();e.startTransaction();const o=await RoomModel.findOne({roomId:a});o&&(o.blocked.push(t),await o.save({session:e})),await e.commitTransaction(),e.endSession(),fetchAndSendUpdates(a),s.status(200).json({message:"User Blocked Successfully!"})}catch(e){console.error("Error Blocking User: "+e),s.status(500).json({error:"An error occurred while blocking the user."})}})),app.post("/createroom",authenticateToken,(async(e,s)=>{const{name:t,pic:a,bio:o,videoUrl:n,usern:r}=e.body.roombody;var i=getlink(n);i=null==i||""==i?"":"https://www.youtube.com/embed/"+i;try{const e=await mongoose.startSession();e.startTransaction();const n={email:r,x:215,y:125},c=generateRandomString(),d={roomId:c,name:t,coordinates:n,badgeurl:a,videourl:i,bio:o,mods:[r]},m=await RoomModel(d);await m.save({session:e});const u=moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),l=new Message({room_id:c,messages:[{user_id:r,content:"xxrp7",time:u},{user_id:r,content:"xxrp7",time:u},{user_id:r,content:"xxrp7",time:u}]});await l.save({session:e}),await e.commitTransaction(),e.endSession(),s.json({stat:200})}catch(e){console.log("Error Creating Room :  "+e)}})),app.post("/updatebadge",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const{email:a,badgeUrl:o}=e.body.badgedata,n=await User.findOneAndUpdate({email:a},{badge:o},{new:!0}).session(t);await t.commitTransaction(),t.endSession(),s.json({message:"Badge updated successfully",user:n})}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.get("/notifications/:userId",authenticateToken,(async(e,s)=>{try{const{userId:t}=e.params,a=await Notification.find({recipient:t,read:!1}).populate("sender");s.status(200).json({notifications:a})}catch(e){console.error(e),s.status(500).json({message:"Internal server error"})}})),app.post("/updateprofilepic",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const{useremail:a,profileurl:o}=e.body.imgdata,n=await User.findOneAndUpdate({email:a},{pic:o},{new:!0}).session(t);await t.commitTransaction(),t.endSession(),s.json({message:"Profile Pic updated successfully",user:n})}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.post("/loadbages",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const e=await badgeModel.aggregate([{$match:{badgeid:"123"}},{$project:{_id:0}}]).session(t);await t.commitTransaction(),t.endSession(),s.json(e[0])}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.post("/updateroom",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();try{await t.withTransaction((async()=>{const{roomid:a,pic:o,name:n,bio:r,videoUrl:i}=e.body.roombody;var d=i;if(i.includes("embed")||(d=null==d||""==d||d.length<=6?"":"https://www.youtube.com/embed/"+(d=getlink(i))),c={},o&&(c.badgeurl=o),n&&(c.name=n),r&&(c.bio=r),i&&(c.videourl=d),!await RoomModel.findOneAndUpdate({roomId:a},{$set:c},{new:!0,session:t}))throw new Error("Room not found");s.json({stat:200})}))}catch(e){}finally{t.endSession()}})),app.get("/messages/:senderId/:recepientId",authenticateToken,(async(e,s)=>{try{const{senderId:t,recepientId:a}=e.params;console.log(t,a);const o=await PersonalMessage.find({$or:[{senderId:t,recepientId:a},{senderId:a,recepientId:t}]}).sort({timestamp:1});s.json(o)}catch(e){console.log(e),s.status(500).json({error:"Internal Server Error"})}})),app.post("/deleteroom",authenticateToken,(async(e,s)=>{const{roomid:t}=e.body;try{if(!await RoomModel.findOneAndDelete({roomId:t}))return s.status(404).json({error:"Room not found"});s.json({s:200})}catch(e){console.log("Room Deletion Failed: "+e),s.status(500).json({error:"Room Deletion Failed"})}})),app.post("/removeprofilepic",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const{user:a}=e.body.a;await User.findOneAndUpdate({email:a},{pic:"https://cdn-icons-png.flaticon.com/512/3177/3177440.png"},{new:!0}).session(t);await t.commitTransaction(),t.endSession(),s.sendStatus(200)}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.post("/removebackpic",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const{user:a}=e.body.a;await User.findOneAndUpdate({email:a},{backgroundPic:"https://as2.ftcdn.net/v2/jpg/01/68/74/87/1000_F_168748763_Mdv7zO7dxuECMzItERhPzWhVJSaORTKd.jpg"},{new:!0}).session(t);await t.commitTransaction(),t.endSession(),s.sendStatus(200)}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.post("/removebio",authenticateToken,(async(e,s)=>{const t=await mongoose.startSession();t.startTransaction();try{const{user:a}=e.body.a;await User.findOneAndUpdate({email:a},{bio:"Hi i am ChatZyr User!"},{new:!0}).session(t);await t.commitTransaction(),t.endSession(),s.sendStatus(200)}catch(e){await t.abortTransaction(),t.endSession(),console.error(e),s.status(500).json({message:"An error occurred"})}})),app.delete("/deleteAccount/:email",(async(e,s)=>{const{email:t}=e.params,a=await mongoose.startSession();a.startTransaction();try{await User.findOneAndDelete({email:t}).session(a),await Notification.deleteMany({$or:[{sender:t},{recipient:t}]}).session(a);const e=await Mods.findOne({$or:[{mod1:t},{mod2:t}]});e&&(e.mod1.includes(t)?e.mod1=e.mod1.filter((e=>e!==t)):e.mod2=e.mod2.filter((e=>e!==t)),await e.save()),removeUserFromFriends(t),deletePerMessages(t);await deleteMessages(t);deleteCoordinates(t),await a.commitTransaction(),a.endSession(),s.status(200).json({message:"User account and associated data deleted successfully."})}catch(e){await a.abortTransaction(),a.endSession(),console.error(e),s.status(500).json({error:"An error occurred while deleting the user account."})}})),app.get("/search",authenticateToken,(async(e,s)=>{const{query:t}=e.query;try{const e=await User.find({username:{$regex:t,$options:"i"}});s.json(e)}catch(e){console.error(e),s.status(500).json({error:"Internal server error"})}})),app.get("/user",authenticateToken,(async(e,s)=>{try{const t=e.query.email;if(!t)return s.status(400).json({message:"Email is required"});const a=await User.findOne({email:t});if(!a)return s.status(404).json({message:"User not found"});s.status(200).json(a)}catch(e){console.error(e),s.status(500).json({message:"Server error"})}})),server.listen(PORT,(()=>{console.log("Sockets Server listening on port "+PORT)}));
+const { Mutex } = require("async-mutex");
+const roomMutex = new Mutex();
+const express = require("express"),
+  mongoose = require("mongoose"),
+  bodyParser = require("body-parser"),
+  moment = require("moment-timezone"),
+  cors = require("cors"),
+  WebSocket = require("ws"),
+  http = require("http"),
+  app = express(),
+  PORT = process.env.PORT || 4000;
+const jwt = require("jsonwebtoken");
+
+app.use(cors({ origin: !0, credentials: !0 })), app.use(bodyParser.json());
+const { mongoUrl: mongoUrl } = require("./dbConnection"),
+  RoomModel = require("./models/roomsdata"),
+  Message = require("./models/message"),
+  badgeModel = require("./models/badges"),
+  ColorsModel = require("./models/colors"),
+  User = require("./models/user"),
+  Offer = require("./models/offermodal"),
+  Mods = require("./models/mods"),
+  Banned = require("./models/banned"),
+  PersonalMessage = require("./models/personalmessage"),
+  userRoutes = require("./routes/userRoutes"),
+  HuzaifaRoutes = require("./routes/huzaifaRoutes"),
+  // { connect: connect } = require("./models/user"),
+  Notification = require("./models/notifications"),
+  CoordinateModel = require("./models/coordinates"),
+  PackageModel = require("./models/vip");
+(Otp = require("./models/otp")),
+  (TransactionModel = require("./models/transactions")),
+  (PaymentDetailsModel = require("./models/PaymentDetails.Js")),
+  (ShopDetails = require("./models/shopdetails")),
+  (Custom = require("./models/custom")),
+  (webProducts = require("./models/webDetails")),
+  (TermsAndConds = require("./models/terms"))(
+    (server = http.createServer(app))
+  );
+
+var nodemailer = require("nodemailer");
+const bcrypt = require("bcrypt");
+
+async function addLikesField() {
+  try {
+    // Update documents to add the likes field with a default value of 0
+    const updateResult = await RoomModel.updateMany(
+      {}, // Match all documents
+      { $set: { roomOwner: "" } } // Add the likes field with a value of 0
+    );
+
+    console.log(
+      `Matched ${updateResult.matchedCount} documents and modified ${updateResult.modifiedCount} documents`
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// Call the function to add the likes field
+// addLikesField();
+
+async function deletePerMessages(userId) {
+  // app.delete("/messages/delete/:userId", async (req, res) => {
+
+  try {
+    // Delete all messages where the sender or recipient ID matches the provided userId
+    const deleteResult = await PersonalMessage.deleteMany({
+      $or: [{ senderId: userId }, { recepientId: userId }],
+    });
+
+    // res.json({ message: "All messages of the user deleted" });
+    // console.log('msgs deleted');
+  } catch (error) {
+    console.error("Error deleting messages:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+  // });
+}
+
+async function deleteCoordinates(deleteemail) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const roomsToDelete = await RoomModel.find({
+      coordinates: {
+        $elemMatch: {
+          email: deleteemail,
+        },
+      },
+    }).session(session);
+
+    for (const room of roomsToDelete) {
+      // Filter the coordinates for the specified email
+      room.coordinates = room.coordinates.filter(
+        (coord) => coord.email !== deleteemail
+      );
+
+      // Save the updated room
+      await room.save();
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    //   console.log(${deleteemail}'s coordinates deleted from rooms.);
+  } catch (error) {
+    // Handle any potential errors
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
+  }
+}
+
+async function mergedates(p, i) {
+  const currentDate = moment().tz("Asia/Karachi");
+  const shopDetailsDocuments = await ShopDetails.find({
+    purchasedBy: p,
+    itemId: i,
+  });
+  var dates = [];
+
+  // Iterate over the ShopDetails documenstss
+  for (const shopDetailsDocument of shopDetailsDocuments) {
+    // Get the purchase date
+    dates.push(shopDetailsDocument.validtill);
+  }
+  await ShopDetails.deleteMany({
+    _id: {
+      $in: shopDetailsDocuments.map(
+        (shopDetailsDocument) => shopDetailsDocument._id
+      ),
+    },
+  });
+
+  const futureDates = dates.filter((dateStr) => {
+    const date = moment.tz(dateStr, "Asia/Karachi");
+    return date.isSameOrAfter(currentDate);
+  });
+
+  if (futureDates.length > 0) {
+    const totalDaysToAdd = futureDates.reduce((total, dateStr) => {
+      const date = moment.tz(dateStr, "Asia/Karachi");
+      const daysDifference = date.diff(currentDate, "days");
+      return total + daysDifference;
+    }, 0);
+    const newDate = currentDate.add(totalDaysToAdd, "days");
+    const finalDate = newDate.format("YYYY-MM-DD HH:mm:ss");
+    const finalDatex = newDate.format("DD-MM-YYYY");
+
+    const asx = {
+      itemId: i,
+      purchasedBy: p,
+      purchaseDate: moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss"),
+
+      validtill: finalDate,
+    };
+    const h = new ShopDetails(asx);
+    await h.save();
+
+    return finalDatex;
+  }
+  return 0;
+}
+
+async function removeUserFromFriends(userEmail) {
+  try {
+    // Find all users where the provided email is in their friends list
+    const usersWithFriend = await User.find({ "friends.email": userEmail });
+
+    // Remove the user's email from each of their friends' lists
+    const promises = usersWithFriend.map(async (user) => {
+      user.friends = user.friends.filter(
+        (friend) => friend.email !== userEmail
+      );
+      await user.save();
+    });
+
+    await Promise.all(promises);
+
+    // console.log(`Removed user with email ${userEmail} from friends' lists.`);
+    return true;
+  } catch (error) {
+    console.error("Error removing user from friends' lists:", error);
+    throw error;
+  }
+}
+
+async function deleteMessages(userToBeDeleted) {
+  try {
+    const rooms = await Message.find({
+      messages: {
+        $elemMatch: {
+          user_id: userToBeDeleted,
+        },
+      },
+    });
+
+    if (rooms && rooms.length > 0) {
+      // Iterate through each room
+
+      for (const room of rooms) {
+        // Filter the messages to exclude the user's messages
+
+        room.messages = room.messages.filter(
+          (message) => message.user_id !== userToBeDeleted
+        );
+
+        // Save the updated room
+        await room.save();
+
+        // console.log('Deleting...');
+      }
+
+      return 1;
+    } else {
+      // console.log("FOUND NOTHING IN ROOMS");
+      return 2;
+    }
+  } catch (error) {
+    // Handle the error
+    console.log("ERR" + error);
+    return 0;
+  }
+}
+deleteMessages("demo1234@gmail.com");
+function genotp() {
+  const min = 10000;
+  const max = 99999;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+var transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "Info.chatzyr@gmail.com",
+    pass: "haan rydj ivyx adcr",
+  },
+});
+
+function sendotp(u, o) {
+  try {
+    Otp.deleteMany({ user: u })
+      .then((result) => {
+        // console.log(`Deletesd documents`);
+
+        const newOtp = new Otp({
+          user: u,
+          code: o,
+        });
+
+        newOtp
+          .save()
+          .then(() => {
+            // console.log('New document added successfully');
+          })
+          .catch((err) => {
+            console.error(err);
+          });
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+
+    var mailOptions = {
+      from: "Info.chatzyr@gmail.com",
+      to: u,
+      subject: "🔐 Verify Your Email for OTP",
+      html: `
+            <html>
+                <head>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            background-color: #f2f2f2;
+                        }
+                        .container {
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                            background-color: #ffffff;
+                            border-radius: 8px;
+                        }
+                        h1 {
+                            color: #007BFF;
+                            text-align: center;
+                        }
+                        p {
+                            color: #333;
+                            font-size: 16px;
+                            text-align: center;
+                        }
+                        .otp {
+                            font-size: 24px;
+                            font-weight: bold;
+                            color: #FF5733;
+                            text-align: center;
+                            margin-top: 20px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>🔐 Verify Your Email for ChatZyr </h1>
+                        <p>Hi there! Please verify your email to complete the OTP verification process.</p>
+                        <p>Your OTP: <span class="otp">${o}</span></p>
+                    </div>
+                </body>
+            </html>
+        `,
+    };
+    transporter.sendMail(mailOptions, function (error, info) {
+      if (error) {
+        console.log(error);
+      } else {
+        //   console.log('Email sent: ' + info.response);
+      }
+    });
+
+    return o;
+  } catch (e) {
+    console.log("Error Sending otp " + e);
+    return 0;
+  }
+}
+
+async function verifyOtp(u, o) {
+  try {
+    // Find the user in the database
+    const user = await Otp.findOne({ user: u });
+
+    // If the user does not exist, return 0
+    if (!user) {
+      return 0;
+    }
+
+    // Check if the OTP matches the user's OTP
+    if (user.code !== o) {
+      return 0;
+    }
+
+    // console.log("OTP Verified");
+    // If the OTP matches, return 1
+    return 1;
+  } catch (error) {
+    console.error("Error:", error);
+    return 0; // Handle the error appropriately
+  }
+}
+
+function generateRandomString() {
+  let e = "";
+  for (let o = 0; o < 7; o++) {
+    const o = Math.floor(62 * Math.random());
+    e +=
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(
+        o
+      );
+  }
+  return e;
+}
+
+function getlink(link) {
+  var startIndex = link.indexOf("v="); // Find the index of "v="
+  if (startIndex !== -1) {
+    startIndex += 2; // Move to the character after "v="
+    var endIndex = link.indexOf("&", startIndex); // Find the index of "&" after "v="
+    if (endIndex !== -1) {
+      return link.substring(startIndex, endIndex); // Extract the video ID
+    } else {
+      return link.substring(startIndex); // If "&" is not found, extract until the end
+    }
+  } else {
+    const match = link.match(/youtu\.be\/(.*?)\?/);
+
+    if (match) {
+      const extractedData = match[1];
+      //   console.log("be wala link "+ extractedData); // This will log "KUpwupYj_tY" to the console
+      return extractedData;
+    } else {
+      //   console.log("No match found. of be");
+
+      const matched = link.match(/live\/(.*?)\?/);
+      if (matched) {
+        return matched[1];
+      } else {
+        return null;
+      }
+    }
+  }
+  return null; // Return null if "v=" is not found in the link
+}
+
+mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
+  mongoose.connection.on("connected", () => {
+    console.log("DB connection successful");
+  }),
+  mongoose.connection.on("error", (e) => {
+    console.log("DB connection failed", e);
+  });
+
+const wss = new WebSocket.Server({ server: server }),
+  roomDataMap = new Map();
+const clientsMap = new Map();
+async function fetchAndSendUpdates(roomId, x) {
+  try {
+    const roomData = await getfromdb(roomId, x);
+
+    const clients = roomDataMap.get(roomId) || [];
+    // console.log("SENDING FOR ROOM "+roomId);
+    // console.log(JSON.stringify(clients));
+
+    var xx = 1;
+    clients.forEach((client) => {
+      client.send(JSON.stringify(roomData));
+      // console.log("SENDING TO CLIENT " + xx);
+      xx++;
+    });
+  } catch (error) {
+    console.error("Error fetching and sending updates:", error);
+  }
+}
+
+const connections = new Set();
+
+async function addservermessage(e, o) {
+  // TO BE DELETED on 12 NOV
+  const userx = await User.find({ email: e.user_id });
+  if (!userx.length > 0) {
+    return null;
+  }
+
+  const s = e;
+  const r = o;
+  const t = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");
+
+  try {
+    // Find the room by roomId
+    const room = await RoomModel.findOne({ roomId: r });
+
+    if (!room) {
+      console.error("Room not found");
+      throw new Error("Room not found");
+    }
+
+    // Check if the email exists in the room's coordinates
+    const emailToCheck = s.user_id; // Assuming s.user_id is the email
+    const emailExists = room.coordinates.some(
+      (coord) => coord.email === emailToCheck
+    );
+    var checking = 0;
+    if (!emailExists) {
+      // console.log("Adding coordinates from function");
+      // The email doesn't exist, so add coordinates
+      room.coordinates.push({ email: emailToCheck, x: 215, y: 125 });
+      await room.save();
+      // console.log('Coordinates added successfully.');
+    } else {
+      // console.log('Coordinates already exist.');
+      checking = 1;
+    }
+
+    let message = await Message.findOne({ room_id: r });
+
+    if (!message) {
+      console.error("Room not found");
+      message = new Message({
+        room_id: r,
+        messages: [{ user_id: s.user_id, content: s.content, time: t }],
+      });
+      await message.save();
+      // console.log("Created New Chat...");
+      fetchAndSendUpdates(r);
+    }
+
+    if (message) {
+      message.messages = message.messages.filter(
+        (msg) => msg.content !== "xxrp7"
+      );
+      // console.log(s.user_id);
+
+      const messageObject = { user_id: s.user_id, content: s.content, time: t };
+      if (s.content == "xxrp7") {
+        fetchAndSendUpdates(r);
+        return null;
+      }
+      message.messages.push(messageObject);
+
+      if (message.messages.length > 60) {
+        const removeCount = message.messages.length - 60;
+        message.messages.splice(0, removeCount);
+      }
+
+      await message.save();
+      if (checking == 1) {
+        fetchAndSendUpdates(r, 1);
+      } else {
+        fetchAndSendUpdates(r);
+      }
+      // console.log("MSG ADDED");
+    }
+
+    // console.log("Operation completed successfully");
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}
+
+async function getfromdb(e, x) {
+  if (x == 1) {
+    try {
+      const o = e,
+        s = await Message.aggregate([
+          { $match: { room_id: o } },
+          {
+            $project: {
+              _id: 0,
+              room_id: 1,
+              messages: {
+                $map: {
+                  input: "$messages",
+                  as: "message",
+                  in: {
+                    user_id: "$$message.user_id",
+                    content: "$$message.content",
+                    time: "$$message.time",
+                  },
+                },
+              },
+            },
+          },
+        ]);
+      // console.log("JUST MESSAGES SENT");
+      return { mess: s[0] };
+    } catch (e) {
+      console.log("CANT FETCH MESSAGES " + e);
+    }
+  }
+
+  if (x == 2) {
+    try {
+      const roomCoordinates = await RoomModel.aggregate([
+        { $match: { roomId: e } },
+        {
+          $project: {
+            _id: 0,
+            roomId: 1,
+            coordinates: {
+              $map: {
+                input: "$coordinates",
+                as: "coord",
+                in: {
+                  _id: "$$coord._id",
+                  email: "$$coord.email",
+                  x: "$$coord.x",
+                  y: "$$coord.y",
+                },
+              },
+            },
+          },
+        },
+      ]);
+
+      // Extract the coordinates and emails into separate arrays
+      const coordinates = roomCoordinates[0].coordinates;
+      s = await Message.aggregate([
+        { $match: { room_id: e } },
+        {
+          $project: {
+            _id: 0,
+            room_id: 1,
+            messages: {
+              $map: {
+                input: "$messages",
+                as: "message",
+                in: {
+                  user_id: "$$message.user_id",
+                  content: "$$message.content",
+                  time: "$$message.time",
+                },
+              },
+            },
+          },
+        },
+      ]);
+      let r = [];
+      if (s[0]) {
+        r = [...new Set(s[0].messages.map((e) => e.user_id))];
+      }
+      // Create the response object with the desired structure
+      const coordResponse = {
+        coordinates,
+        users: r,
+      };
+      // console.log(roomCoordinates[0]);
+      return { coordinates: coordResponse };
+    } catch (e) {
+      console.log("Cannot fetch coordinates: " + e);
+    }
+  }
+
+  try {
+    const o = e,
+      s = await Message.aggregate([
+        { $match: { room_id: o } },
+        {
+          $project: {
+            _id: 0,
+            room_id: 1,
+            messages: {
+              $map: {
+                input: "$messages",
+                as: "message",
+                in: {
+                  user_id: "$$message.user_id",
+                  content: "$$message.content",
+                  time: "$$message.time",
+                },
+              },
+            },
+          },
+        },
+      ]);
+    let r = [];
+    if (s[0]) {
+      r = [...new Set(s[0].messages.map((e) => e.user_id))];
+    }
+    const t = await User.aggregate([
+      { $match: { email: { $in: r } } },
+      {
+        $project: {
+          _id: 0,
+          chatcolor: 1, // Include the chatcolor field
+          usernamecolor: 1,
+          username: 1,
+          password: 1,
+          email: 1,
+          badge: 1,
+          pic: 1,
+          backgroundPic: 1,
+          bio: 1,
+          likes: 1,
+          friends: 1,
+          premium: 1,
+        },
+      },
+    ]);
+    const a = await RoomModel.aggregate([
+      { $match: { roomId: o } },
+      { $project: { _id: 0 } },
+    ]);
+    const n = t.reduce((e, o) => {
+      const {
+        usernamecolor,
+        chatcolor,
+        username: s,
+        password: r,
+        email: t,
+        badge: a,
+        pic: n,
+        backgroundPic: i,
+        bio: c,
+        likes: d,
+        friends: m,
+        premium: l,
+      } = o;
+      return (
+        (e[t] = {
+          chatcolor, // Add chatcolor to the object
+          usernamecolor,
+          name: s,
+          email: t,
+          password: r,
+          badge: a,
+          pic: n,
+          backgroundPic: i,
+          bio: c,
+          likes: d,
+          friends: m,
+          premium: l,
+        }),
+        e
+      );
+    }, {});
+    const roomCoordinates = await RoomModel.aggregate([
+      { $match: { roomId: e } },
+      {
+        $project: {
+          _id: 0,
+          roomId: 1,
+          coordinates: {
+            $map: {
+              input: "$coordinates",
+              as: "coord",
+              in: {
+                _id: "$$coord._id",
+                email: "$$coord.email",
+                x: "$$coord.x",
+                y: "$$coord.y",
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    // Extract the coordinates and emails into separate arrays
+    const coordinates = roomCoordinates[0].coordinates;
+
+    // Create the response object with the desired structure
+
+    RoomModel.updateMany({}, { $set: { users: r } })
+      .then((e) => {})
+      .catch((e) => {
+        console.error("Error updating users:", e);
+      });
+    RoomModel.updateMany(
+      { "coordinates.x": { $exists: !1 }, "coordinates.y": { $exists: !1 } },
+      { $set: { "coordinates.x": 215, "coordinates.y": 125 } }
+    )
+      .then((e) => {})
+      .catch((e) => {
+        console.error("Error updating coordinates:", e);
+      });
+    const i = await Mods.aggregate([{ $project: { _id: 0 } }]);
+    const c = { ...a[0], users: r, activemods: i };
+    const coordResponse = {
+      coordinates,
+      users: r,
+    };
+    return {
+      mess: s[0],
+      userdetails: n,
+      roomdata: c,
+      coordinates: coordResponse,
+    };
+  } catch (e) {
+    throw (console.error("Error in getfromdb:", e), e);
+  }
+}
+
+var roomids = [];
+async function updateCoordinatesWithRetry(roomId, userId, x, y) {
+  const room = await RoomModel.findOne({ roomId });
+
+  if (!room) {
+    throw new Error("Room Not Found!");
+  }
+  const userIndex = room.coordinates.findIndex((obj) => obj.email === userId);
+
+  // console.log("INDEX IS " + userIndex);
+  // const userIndex = room.users.indexOf(userId);
+
+  if (userIndex === -1) {
+    throw new Error("User Not Found!");
+  }
+
+  if (room.coordinates[userIndex]) {
+    room.coordinates[userIndex].x = x;
+    room.coordinates[userIndex].y = y;
+    // console.log("UPDATING COORD");
+  } else {
+    room.coordinates[userIndex] = { email: userId, x, y };
+  }
+
+  await room.save();
+  fetchAndSendUpdates(roomId, 2);
+  // console.log("COORDINATES UPDATES SUCESSFULLY " + x, y);
+}
+const activeUsers = new Map(); // Use a Map to store active users and their last active time
+const inactivityTimeout = 2.5 * 60 * 1000; // 2.5 minutes in milliseconds
+setInterval(() => {
+  const currentTime = Date.now();
+  activeUsers.forEach((userData, email) => {
+    if (currentTime - userData.lastActive > inactivityTimeout) {
+      // User has been inactive for more than the specified time
+      // Remove the user from activeUsers and close the connection
+      activeUsers.delete(email);
+      // console.log("DELETED " + email);
+      // userData.connection.close();
+    }
+  });
+}, 15000); // Check for inactivity every second
+
+const userConnections = new Map();
+
+wss.on("connection", (e) => {
+  connections.add(e),
+    console.log("WebSocket client connected"),
+    e.on("message", async (o) => {
+      try {
+        const s = JSON.parse(o);
+        if (s.action == "ping") {
+          // console.log("PING");
+          // Received a "ping" message from the client, respond with a "pong"
+          const t = { msg: "pong" };
+          e.send(JSON.stringify(t));
+        } else if (s.action === "getFriends") {
+          const { userId } = s.data;
+
+          try {
+            // Find the user with the specified userId
+            const user = await User.findOne({ email: userId });
+
+            if (!user) {
+              return res.status(404).json({ message: "User not found" });
+            }
+
+            // Get the list of friend emails
+            const friendEmails = user.friends.map((friend) => friend.email);
+
+            // Find the details of each friend using their email addresses
+            const friendDetails = await User.find({
+              email: { $in: friendEmails },
+            });
+
+            // Fetch the last message for each friend
+            const messages = await Promise.all(
+              friendDetails.map(async (friend) => {
+                const lastMessage = await PersonalMessage.find({
+                  $or: [
+                    { senderId: userId, recepientId: friend.email },
+                    { senderId: friend.email, recepientId: userId },
+                  ],
+                })
+                  .sort({ timeStamp: -1 }) // Sort by timestamp in descending order
+                  .limit(1); // Limit the result to only one message
+
+                // console.log(lastMessage);
+                return {
+                  ...friend.toObject(),
+                  lastMessage: lastMessage, // Assuming lastMessage is the message itself
+                };
+              })
+            );
+            // Return the details of friends along with their last messages to the frontend
+            // res.json({ friends: messages });
+            e.send(JSON.stringify({ friends: messages }));
+          } catch (error) {
+            console.error("Error fetching user friends:", error);
+            res.status(500).json({ message: "Internal server error" });
+          }
+        } else if (s.action === "getNotifications") {
+          // Handle the 'getNotifications' action here
+          const { recipientEmail } = s.data;
+          // console.log("ALIVE REQ "+ recipientEmail);
+          activeUsers.set(recipientEmail, {
+            connection: e,
+            lastActive: Date.now(),
+          });
+
+          try {
+            const notifications = await Notification.find({
+              recipient: recipientEmail,
+              read: false,
+            }).populate("sender");
+            // Send the notifications to the client
+            e.send(JSON.stringify({ notifications }));
+            const onlineusers = Array.from(activeUsers.keys());
+            e.send(JSON.stringify({ onlineusers }));
+          } catch (error) {
+            console.error("Error fetching notifications:", error);
+          }
+        } else if (s.messageType === "text") {
+          // Save the chat message to MongoDB using Mongoose
+          try {
+            const { senderId, recipientId, messageType, message } = s;
+            // console.log(senderId, recipientId);
+            userConnections.set(senderId, e);
+            const receiverConnection = userConnections.get(recipientId);
+
+            const newMessage = new PersonalMessage({
+              senderId,
+              recepientId: recipientId,
+              messageType,
+              message: message,
+              timestamp: new Date(),
+            });
+
+            await newMessage.save();
+
+            if (e.readyState === WebSocket.OPEN) {
+              e.send(JSON.stringify(newMessage));
+            }
+
+            // if (receiverConnection && receiverConnection.readyState === WebSocket.OPEN) {
+            //   receiverConnection.send(JSON.stringify(newMessage));
+            // }
+            // console.log('message sent!');
+            // Broadcast the message to all connected clients
+            if (
+              receiverConnection &&
+              receiverConnection.readyState === WebSocket.OPEN
+            ) {
+              receiverConnection.send(JSON.stringify(newMessage));
+              await PersonalMessage.updateOne(
+                { _id: newMessage._id },
+                { $set: { read: true } }
+              );
+            }
+            // wss.clients.forEach((client) => {
+            //   // console.log(client);
+            //   if (client !== e && client.readyState === WebSocket.OPEN) {
+            //     client.send(JSON.stringify(newMessage));
+            //     newMessage = await PersonalMessage.updateOne(
+            //       { $set: { read: true } }
+            //     )
+            //   }
+            // });
+
+            const messageCount = await PersonalMessage.countDocuments({
+              senderId,
+              recepientId: recipientId,
+            });
+
+            // If the count exceeds the limit (e.g., 60), delete the oldest message
+            const messageLimit = 40;
+            // console.log(messageCount);
+            if (messageCount > messageLimit) {
+              const oldestMessage = await PersonalMessage.findOne(
+                {
+                  $or: [
+                    { senderId, recepientId: recipientId },
+                    { senderId: recipientId, recepientId: senderId },
+                  ],
+                },
+                {},
+                { sort: { timestamp: 1 } }
+              );
+
+              if (oldestMessage) {
+                // console.log(oldestMessage);
+
+                // Delete the oldest message
+                await PersonalMessage.deleteOne({ _id: oldestMessage._id });
+                // console.log(oldestMessage+ ' msg deleted');
+              }
+            } else {
+              // console.error("No messages found to remove.");
+            }
+          } catch (error) {
+            console.error("Error saving chat message:", error);
+          }
+        } else if (s.action == "pingdm") {
+          const tx = { msg: "pong" };
+          e.send(JSON.stringify(tx));
+        } else if (s.action === "getMessages") {
+          const { senderEmail, recipientEmail } = s.data;
+          const updateResult = await PersonalMessage.updateMany(
+            {
+              $or: [
+                { senderId: senderEmail, recepientId: recipientEmail },
+                { senderId: recipientEmail, recepientId: senderEmail },
+              ],
+              read: false, // Only mark unread messages as read
+            },
+            { $set: { read: true } }
+          );
+          const messages = await PersonalMessage.find({
+            $or: [
+              { senderId: senderEmail, recepientId: recipientEmail },
+              { senderId: recipientEmail, recepientId: senderEmail },
+            ],
+          }).sort({ timestamp: 1 });
+          // console.log(messages);
+          // Send the retrieved messages to the client
+          e.send(JSON.stringify(messages));
+          // return messages;
+          // console.log('');
+        } else if ("x" in s) {
+          const { roomId1, userId, x, y } = s;
+          try {
+            // console.log("ROOM ID " + roomId1);
+            // console.log("USER ID " + userId);
+
+            await updateCoordinatesWithRetry(roomId1, userId, x, y);
+          } catch (error) {
+            console.error("Failed to update coordinates inside sockets", error);
+          }
+        }
+        // else if ("roomId" in s) {
+        //     const o = s.roomId;
+        //     roomDataMap.has(o) || roomDataMap.set(o, []), roomDataMap.get(o).push(e), ;
+        // }
+
+        // else if ("roomId" in s) {
+        //     const roomId = s.roomId;
+        //     if (!roomDataMap.has(roomId)) {
+        //         roomDataMap.set(roomId, []);
+        //     }
+        //     roomDataMap.get(roomId).push(e);
+
+        // }
+        else if ("roomId" in s) {
+          const roomId = s.roomId;
+
+          roomMutex
+            .runExclusive(async () => {
+              if (!roomDataMap.has(roomId)) {
+                // console.log("ROOM NF " + roomId);
+                roomDataMap.set(roomId, []);
+                roomids.push(roomId);
+              }
+
+              // console.log("ADDED To " + roomId);
+              roomDataMap.get(roomId).push(e);
+
+              roomids.push(roomId);
+            })
+            .then(() => {
+              const uniqueRoomIds = new Set(roomids);
+              const idx = Array.from(uniqueRoomIds);
+              roomids.length = 0;
+              roomids = [];
+
+              idx.forEach((roome) => {
+                fetchAndSendUpdates(roome);
+              });
+              // console.log("SENT UPDATES!!");
+            });
+        } else if ("room_id" in s) {
+          addservermessage(s.mymessage, s.room_id);
+        }
+      } catch (e) {
+        console.error("Error parsing JSON:", e);
+      }
+    }),
+    e.on("close", () => {
+      roomDataMap.forEach((clients, roomId) => {
+        const index = clients.indexOf(e);
+        if (index !== -1) {
+          clients.splice(index, 1); // Remove the disconnected user from the room
+        }
+      });
+      userConnections.forEach((connection, userId) => {
+        if (connection === e) {
+          userConnections.delete(userId);
+        }
+      });
+      connections.delete(e), console.log("WebSocket client disconnected");
+      clientsMap.delete(e);
+    });
+}),
+  app.use(userRoutes),
+  // Huzaifa New Routes
+  app.use(HuzaifaRoutes),
+  //Tahir New Routes
+
+  app.get("/find-package", authenticateToken, async (req, res) => {
+    const email = req.query.email; // Get the email from the request query string
+
+    try {
+      // Find all ShopDetails by the purchasedBy email
+      const shopDetails = await ShopDetails.find({ purchasedBy: email });
+
+      if (shopDetails) {
+        // Initialize an array to store the results
+        const result = [];
+
+        // Iterate through the shopDetails array
+        for (const detail of shopDetails) {
+          // Get the itemId for each detail
+          const itemId = detail.itemId;
+
+          // Find the corresponding Package using the itemId
+          const package = await PackageModel.findOne({ id: itemId });
+
+          if (package) {
+            // Push the result to the array
+            result.push({
+              title: package.title,
+              validtill: detail.validtill,
+            });
+          }
+        }
+
+        if (result.length > 0) {
+          // Return the array of results
+          // console.log(JSON.stringify(result));
+          res.json(result);
+        } else {
+          res.status(404).json({ message: "No matching packages found" });
+        }
+      } else {
+        res.status(404).json({ message: "ShopDetails not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+app.put("/messages/mark-all-read/:user1/:user2", async (req, res) => {
+  try {
+    const { user1, user2 } = req.params;
+
+    // Update all unread messages between user1 and user2 to set their 'read' status as 'true'
+
+    res.json({ message: "All unread messages between users marked as read" });
+  } catch (error) {
+    console.error("Error marking messages as read:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+app.post("/unblockuser", authenticateToken, async (req, res) => {
+  const { roomIdx, userIdx } = req.body;
+  // console.log(roomIdx,userIdx);
+
+  try {
+    // Find the room document by roomId
+    const room = await RoomModel.findOne({ roomId: roomIdx });
+
+    if (!room) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+
+    // Check if the user is in the blocked array
+    const userIndex = room.blocked.indexOf(userIdx);
+    // console.log( "ss "+userIndex);
+    if (userIndex !== -1) {
+      // Remove the user from the blocked array
+      room.blocked.splice(userIndex, 1);
+
+      // Save the updated room document
+      await room.save();
+      fetchAndSendUpdates(roomIdx);
+      return res.sendStatus(200);
+    } else {
+      return res.sendStatus(404);
+    }
+  } catch (error) {
+    console.error(error);
+    return res.sendStatus(500);
+  }
+});
+
+app.post("/verotp", async (req, res) => {
+  try {
+    //   console.log(req.body.otp,req.body.email);
+    var a = await verifyOtp(req.body.email, req.body.otp);
+
+    if (a) {
+      // console.log("DUSTED");
+      res.sendStatus(200);
+    } else {
+      res.sendStatus(203);
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500);
+  }
+});
+// Define a route to fetch and store the data
+app.get("/webDetails", async (req, res) => {
+  try {
+    const details = await webProducts.find(); // Retrieve all details from the collection
+    res.json(details); // Send the details as a JSON response
+    // console.log('details Sent!');
+  } catch (error) {
+    console.error("Error fetching web details:", error);
+    res.status(500).send("Error fetching web details");
+  }
+});
+
+// Endpoint to handle order details and send email
+app.post("/sendOrderEmail", (req, res) => {
+  const { prodname, price, orderID, orderDetails } = req.body; // Assume the request contains order details
+
+  // Compose email
+  const mailOptions = {
+    from: orderDetails.email,
+    to: "chatzyr@gmail.com", // Replace with the specific email
+    subject: "New Order",
+    text: `New order received!\nDetails:\nOrder ID: ${orderID}\nName: ${orderDetails.name}\nEmail: ${orderDetails.email}\nProduct: ${prodname}\nPrice: $${price}`,
+  };
+
+  // Send email
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log(error);
+      res.status(500).send("Error"); // Handle error response
+    } else {
+      // console.log('Email sent: ' + info.response);
+      res.send("Email sent"); // Send success response
+    }
+  });
+});
+
+app.post("/sendcoin", authenticateToken, async (req, res) => {
+  const { sendby, sendto, amount } = req.body;
+
+  const session = await mongoose.startSession();
+  if (sendby === sendto) {
+    res.sendStatus(203);
+    return 0;
+  }
+  try {
+    await session.withTransaction(async () => {
+      // Find the sender user
+
+      const user = await User.findOne({ email: sendby }).session(session);
+      const userx = await User.findOne({ email: sendto }).session(session);
+      if (!user || !userx) {
+        res.sendStatus(203);
+        if (!userx) console.log("User Not Found Receiver ");
+        return null;
+      }
+
+      if (user.balance < amount) {
+        res.sendStatus(205); // Change the status code to 400 for a bad request
+
+        return null;
+      }
+
+      // Update the sender's balance
+
+      var xa = parseFloat(parseFloat(user.balance) - parseFloat(amount));
+      user.balance = xa.toString();
+
+      await user.save();
+
+      // Find the recipient user
+
+      // Update the recipient's balance
+
+      var x = parseFloat(parseFloat(userx.balance) + parseFloat(amount));
+      userx.balance = x.toString();
+
+      await userx.save();
+    });
+
+    // Send a success response
+
+    res.sendStatus(200);
+  } catch (e) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+  } finally {
+    session.endSession(); // Close the session when done
+  }
+});
+
+app.post("/buyitem", authenticateToken, async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");
+    const { itemid, userid, type, price, duration } = req.body;
+    // console.log(req.body);
+    const user = await User.findOne({ email: userid }).session(session);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const currentBalance = user.balance;
+
+    if (price <= currentBalance) {
+      const shopItem = await PackageModel.findOne({ id: itemid }).session(
+        session
+      );
+
+      if (!shopItem) {
+        throw new Error("Shop item noot found");
+      }
+
+      if (type === "badge") {
+        user.badge = shopItem.id;
+
+        try {
+          const cus = await Custom.findOne({ userid: userid }).session(session);
+
+          if (cus) {
+            cus.badges.push(shopItem.id);
+            await cus.save();
+          } else {
+            const ap = {
+              userid: userid,
+              badges: [shopItem.id],
+              colors: [],
+            };
+
+            const cux = new Custom(ap);
+            await cux.save();
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          // Handle the error as needed (log, throw, etc.)
+        }
+      } else if (type === "chatcolor") {
+        console.log("in color");
+        user.chatcolor = shopItem.id;
+        try {
+          const cusx = await Custom.findOne({ userid: userid }).session(
+            session
+          );
+
+          if (cusx) {
+            cusx.colors.push(shopItem.id);
+            await cusx.save();
+            console.log("ALL SET COLOR xx");
+          } else {
+            const apx = {
+              userid: userid,
+              badges: [],
+              colors: [shopItem.id],
+            };
+
+            const cuxx = new Custom(apx);
+            await cuxx.save();
+            console.log("ALL SET COLOR");
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          // Handle the error as needed (log, throw, etc.)
+        }
+      } else if (type === "namecolor") {
+        user.namecolor = shopItem.id;
+      } else if (type === "vip2") {
+        // Determine which VIP level you want to apply
+        // Assuming shopItem contains vip1, vip2, vip3 properties
+        user.premium = shopItem.type;
+      } else if (type === "vip3") {
+        // Determine which VIP level you want to apply
+        // Assuming shopItem contains vip1, vip2, vip3 properties
+        user.premium = shopItem.type;
+      }
+
+      user.balance -= price;
+
+      await user.save();
+      var newbuying = {};
+      if (duration == "1 Month") {
+        const parsedTime = moment(time, "YYYY-MM-DD HH:mm:ss");
+
+        const newTime = parsedTime.add(30, "days");
+        const afteronemonth = newTime.format("YYYY-MM-DD HH:mm:ss");
+        newbuying = {
+          itemId: itemid,
+          purchasedBy: userid,
+          purchaseDate: time,
+          validtill: afteronemonth,
+        };
+      }
+
+      if (duration == "3 Months") {
+        const parsedTime = moment(time, "YYYY-MM-DD HH:mm:ss");
+
+        const newTime = parsedTime.add(90, "days");
+        const afteronemonth = newTime.format("YYYY-MM-DD HH:mm:ss");
+        newbuying = {
+          itemId: itemid,
+          purchasedBy: userid,
+          purchaseDate: time,
+          validtill: afteronemonth,
+        };
+      }
+      if (duration == "6 Months") {
+        const parsedTime = moment(time, "YYYY-MM-DD HH:mm:ss");
+
+        const newTime = parsedTime.add(180, "days");
+        const afteronemonth = newTime.format("YYYY-MM-DD HH:mm:ss");
+        newbuying = {
+          itemId: itemid,
+          purchasedBy: userid,
+          purchaseDate: time,
+          validtill: afteronemonth,
+        };
+      }
+      if (duration == "1 Year") {
+        const parsedTime = moment(time, "YYYY-MM-DD HH:mm:ss");
+
+        const newTime = parsedTime.add(364, "days");
+        const afteronemonth = newTime.format("YYYY-MM-DD HH:mm:ss");
+        newbuying = {
+          itemId: itemid,
+          purchasedBy: userid,
+          purchaseDate: time,
+          validtill: afteronemonth,
+        };
+      }
+      const sx = new ShopDetails(newbuying);
+      await sx.save();
+
+      //transation sucessful
+      //send xxrp7 message if socket connection is already made
+      //refresh balance
+      const a = await mergedates(userid, itemid);
+      if (a != 0) {
+        res.status(200).json({ date: a, title: shopItem.title });
+        await session.commitTransaction();
+        session.endSession();
+      } else {
+        res.sendStatus(202);
+        await session.commitTransaction();
+        session.endSession();
+      }
+    } else {
+      //LOW BALANCE ALERT
+      res.sendStatus(202);
+      await session.commitTransaction();
+      session.endSession();
+    }
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
+    //AN ERROR ACCOURED TRY AGAIN ALERT
+    res.sendStatus(400); // You may want to return an error status code
+  }
+});
+
+app.get("/api/packages", authenticateToken, async (req, res) => {
+  try {
+    // Fetch all packages from the database
+    const packages = await PackageModel.find();
+    res.json(packages);
+  } catch (error) {
+    console.error("Error fetching packages:", error);
+    res
+      .status(500)
+      .json({ error: "An error occurred while fetching packages" });
+  }
+});
+
+app.post("/sendotp", async (req, res) => {
+  try {
+    var p = sendotp(req.body.email, genotp());
+    if (p != 0) {
+      res.json({ otp: p });
+      // console.log("TOP SEND "+p);
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500);
+  }
+});
+app.post("/resetpassword", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      res.sendStatus(202);
+      throw new Error("User not found");
+    }
+
+    user.password = hashedPassword;
+
+    await user.save();
+    res.sendStatus(200);
+  } catch (error) {
+    console.log(error);
+    return res.status(500);
+  }
+});
+app.post("/storesms", async (req, res) => {
+  // console.log("HERE");
+  const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");
+
+  for (var i = 0; i < req.body.length; i++) {
+    var xx = req.body[i];
+    var trans = xx["Trx ID"];
+    trans = trans.replace("Trx ID ", "");
+    const a = { transaction_id: trans, amount: xx["Amount"], time: time };
+    const x = new TransactionModel(a);
+    x.save().catch((e) => {
+      if (e.message.includes("duplicate key")) {
+      }
+    });
+  }
+  res.sendStatus(200);
+});
+
+app.get(
+  "/find-transaction/:transaction_id",
+  authenticateToken,
+  async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const transactionId = req.params.transaction_id;
+      const userEmail = req.query.userEmail;
+
+      //   console.log(transactionId);
+
+      // Find the transaction by transaction_id within the session
+      const transaction = await TransactionModel.findOne({
+        transaction_id: transactionId,
+      }).session(session);
+
+      if (!transaction) {
+        // Abort the session and return a 404 response
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      // console.log(transaction.status);
+      if (transaction.status === "verified") {
+        // Assuming you have user email available in the request (req.userEmail)
+
+        // Update the transaction status and email within the session
+        transaction.status = "done";
+        transaction.email = userEmail;
+
+        const user = await User.findOne({ email: userEmail }).session(session);
+
+        if (user) {
+          // Update the user's balance
+          user.balance += parseFloat(transaction.amount);
+          // Save the updated user and transaction within the session
+          await Promise.all([
+            user.save({ session }),
+            transaction.save({ session }),
+          ]);
+
+          // Commit the session
+          await session.commitTransaction();
+          session.endSession();
+
+          // Return the updated amount and a 200 status to the frontend
+          return res.status(200).json({ amount: user.balance });
+        } else {
+          // If user is not found, abort the session
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(404).json({ message: "User not found" });
+        }
+      } else {
+        // Abort the session and return a 403 response
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ message: "Transaction is not verified" });
+      }
+    } catch (error) {
+      console.error(error);
+
+      // Abort the session in case of an error and return a 500 response
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+// Define a route to fetch payment details
+app.get("/api/payment-details", authenticateToken, async (req, res) => {
+  try {
+    const paymentDetails = await PaymentDetailsModel.findOne({}); // Use await to wait for the promise
+    if (!paymentDetails) {
+      return res.status(404).json({ error: "Payment details not found" });
+    }
+    res.json(paymentDetails);
+  } catch (err) {
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
+  try {
+    const email = req.params.email;
+
+    // Find all transactions with the given email and status "done"
+    const transactions = await TransactionModel.find({ email });
+
+    if (transactions.length === 0) {
+      return res.status(404).json({
+        message:
+          'No transactions found with status "done" for the specified email.',
+      });
+    }
+
+    res.status(200).json(transactions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+function authenticateToken(req, res, next) {
+  const token = req.headers["authorization"];
+  // console.log("SERVER HD "+JSON.stringify(req.headers));
+
+  if (token === undefined) {
+    // console.log("TOKEN UNDEFINED");
+    return res.sendStatus(401);
+  }
+
+  jwt.verify(token, "Q$r2K6W8n!jCW%Zk", (err, user) => {
+    if (err) {
+      // console.log("TOKEN FAILED");
+      return res.sendStatus(403);
+    }
+    req.user = user;
+    next();
+  });
+}
+app.get("/fetchver", authenticateToken, async (e, o) => {
+  console.log("HERE");
+  try {
+    t = { version: "3.0.0", link: "https://www.chatzyr.net/" };
+    o.json(t);
+  } catch (e) {
+    console.error("Error:", e),
+      o.status(500).json({ error: "Internal server error" });
+  }
+}),
+  app.get("/fetchData", authenticateToken, async (e, o) => {
+    try {
+      // console.log("fetch data");
+      const e = await RoomModel.find(),
+        s = await Offer.aggregate([{ $project: { _id: 0, __v: 0 } }]),
+        r = await Mods.aggregate([{ $project: { _id: 0, __v: 0 } }]),
+        rx = await Banned.aggregate([{ $project: { _id: 0, __v: 0 } }]),
+        t = { documents: e, offer: s[0], mymods: r, banned: rx };
+      o.json(t);
+    } catch (e) {
+      console.error("Error:", e),
+        o.status(500).json({ error: "Internal server error" });
+    }
+  }),
+  app.post("/fetchcolors", authenticateToken, async (req, res) => {
+    const { userid } = req.body.a;
+    // console.log("AA " + userid);
+    try {
+      const t = await User.find(
+        { email: userid },
+        { _id: 0, chatcolor: 1, premium: 1 }
+      );
+
+      // Query the database to fetch all colorss
+      const allColors = await ColorsModel.aggregate([
+        {
+          $project: {
+            _id: 0, // Exclude the _id field
+            __v: 0, // Exclude the __v field
+          },
+        },
+      ]);
+
+      const rex = { allcolors: allColors, premium: t[0] };
+      res.status(200).json(rex);
+    } catch (err) {
+      console.log(err);
+      // Handle any errors that occur during the database query
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+app.post("/updatebackgroundpic", authenticateToken, async (e, o) => {
+  const s = await mongoose.startSession();
+  s.startTransaction();
+  try {
+    const { useremail: r, profileurl: t } = e.body.imgdata,
+      a = await User.findOneAndUpdate(
+        { email: r },
+        { backgroundPic: t },
+        { new: !0 }
+      ).session(s);
+    await s.commitTransaction(),
+      s.endSession(),
+      o.json({ message: "Profile Pic updated successfully", user: a });
+    // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+  } catch (e) {
+    await s.abortTransaction(),
+      s.endSession(),
+      console.error(e),
+      o.status(500).json({ message: "An error occurred" });
+  }
+}),
+  app.get("/terms", async (req, res) => {
+    try {
+      const termsData = await TermsAndConds.find();
+      res.json(termsData);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+app.get("/users/:email/profile", authenticateToken, async (e, o) => {
+  try {
+    const s = e.params.email;
+    // console.log(s);
+    const r = await User.findOne({ email: s });
+    if (!r) return o.status(404).json({ message: "User not found" });
+    o.status(200).json(r);
+  } catch (e) {
+    console.error(e), o.status(500).json({ message: "Server error" });
+  }
+}),
+  app.put("/users/:email/updateprofile", async (e, s) => {
+    try {
+      const t = e.params.email,
+        { username: a, bio: o } = e.body,
+        n = await User.findOne({ email: t });
+      if (!n) return s.status(404).json({ message: "User not found" });
+      (n.username = a),
+        (n.bio = o),
+        await n.save(),
+        s.status(200).json({ message: "User updated successfully" });
+    } catch (e) {
+      console.error(e), s.status(500).json({ message: "Server error" });
+    }
+  }),
+  app.put("/updateprofile", authenticateToken, async (req, res) => {
+    try {
+      // console.log(req.body);
+      const userEmail = req.body.email;
+      const { username, bio } = req.body;
+
+      const user = await User.findOne({ email: userEmail });
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      user.username = username;
+      user.bio = bio;
+      await user.save();
+
+      res.status(200).json({ message: "User updated successfully" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+app.post(
+  "/users/:userId/increment-likes",
+  authenticateToken,
+  async (req, res) => {
+    const { userId: likedUserId } = req.params;
+    const { user: loggedInUser } = req.body; // Assuming you have the logged-in user information in the request body
+    // console.log(req.body,req.params);
+    try {
+      // Check if the logged-in user has already liked the profile of the user with likedUserId
+      const likedUser = await User.findOne({ email: likedUserId });
+      if (!likedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if the logged-in user's ID is in the likedBy array of the likedUser
+      if (likedUser.likedBy.includes(loggedInUser)) {
+        return res
+          .status(400)
+          .json({ message: "You have already liked this profile" });
+      }
+
+      // Increment the likes count of the likedUser and add the logged-in user's ID to the likedBy array
+      likedUser.likes += 1;
+      likedUser.likedBy.push(loggedInUser);
+
+      // Save the updated likedUser
+      await likedUser.save();
+
+      // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+
+      return res.status(200).json({ user: likedUser });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+app.post("/warning-notifications", authenticateToken, async (req, res) => {
+  try {
+    const { sender: s, recipients: r, message: t, type: a, pic: n } = req.body;
+
+    const notifications = r.map(async (recipient) => {
+      // Check if recipient is null and handle it
+      if (recipient === null || recipient == "") {
+        // Handle the null recipient case here, you may skip creating the notification or set a default recipient.
+      } else {
+        try {
+          const notification = new Notification({
+            sender: s,
+            recipient,
+            message: t,
+            type: a,
+            pic: n,
+          });
+          await notification.save();
+          return notification;
+        } catch (e) {
+          // console.log("Error creating Noti " + recipient);
+        }
+      }
+    });
+
+    await Promise.all(notifications);
+    res.status(201).json({ message: "Notifications created" });
+    //   console.log("Notifications created");
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+app.post("/loadcustom", authenticateToken, async (e, o) => {
+  const ua = e.body.email;
+  const s = await mongoose.startSession();
+  s.startTransaction();
+  try {
+    const e = await Custom.aggregate([
+      { $match: { userid: ua } },
+      { $project: { _id: 0 } },
+    ]).session(s);
+    await s.commitTransaction(), s;
+    s.endSession(), o.json(e[0]);
+    // console.log("BADGES SENT");
+  } catch (e) {
+    await s.abortTransaction(),
+      s.endSession(),
+      console.error(e),
+      o.status(500).json({ message: "An error occurred" });
+  }
+}),
+  app.post("/notifications", authenticateToken, async (req, res) => {
+    try {
+      const { sender: s, recipient: r, message: t, type: a } = req.body;
+
+      if (a === "friendRequest") {
+        console.log("fr");
+        // Check if recipient is already a friend
+        const recipientUser = await User.findOne({ email: r });
+
+        if (
+          recipientUser &&
+          recipientUser.friends.some((friend) => friend.email === s)
+        ) {
+          // console.log("already a friend");
+          // The recipient is already a friend, send a response
+          return res
+            .status(200)
+            .json({ message: "You are already friends with this user" });
+        } else {
+          const existingFriendRequest = await Notification.findOne({
+            sender: s,
+            recipient: r,
+            type: "friendRequest",
+            read: false,
+          });
+
+          if (existingFriendRequest) {
+            // console.log("Friend request notification already sent");
+            return res
+              .status(202)
+              .json({ message: "Friend request already sent" });
+          }
+
+          const senderUser = await User.findOne({ email: s });
+          const notification = new Notification({
+            sender: s,
+            recipient: r,
+            message: ` ${senderUser.username} ${t}`, // Concatenate sender's name with message
+            type: a,
+            pic: senderUser.pic, // Use sender's picture
+          });
+
+          await notification.save();
+          res.status(201).json({ message: "Notification created" });
+          // console.log("Notification created");
+        }
+      }
+      if (a === "profileLike") {
+        // Check if recipient is already a friend
+        const recipientUser = await User.findOne({ email: r });
+        const senderUser = await User.findOne({ email: s });
+        const notification = new Notification({
+          sender: s,
+          recipient: r,
+          message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+          type: a,
+          pic: senderUser.pic, // Use sender's picture
+        });
+        await notification.save();
+        res.status(201).json({ message: "Notification created" });
+        // console.log("Notification created");
+      }
+      if (a === "coins") {
+        // Check if recipient is already a friend
+        const recipientUser = await User.findOne({ email: r });
+        const senderUser = await User.findOne({ email: s });
+        const notification = new Notification({
+          sender: s,
+          recipient: r,
+          message: `${senderUser.username} ${t}`, // Concatenate sender's name with message
+          type: a,
+          pic: senderUser.pic, // Use sender's picture
+        });
+        await notification.save();
+        res.status(201).json({ message: "Notification created" });
+        // console.log("Notification created");
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+app.post("/addfriend", authenticateToken, async (e, o) => {
+  const {
+    username: s,
+    useremail: r,
+    friendUsername: t,
+    friendEmail: a,
+  } = e.body;
+  console.log(e.body);
+  // console.log("friend req");
+  try {
+    const e = await User.findOne({ email: r });
+    if (!e) return o.status(404).json({ error: "Sender not found" });
+    const n = await User.findOne({ email: a });
+    if (!n) return o.status(404).json({ error: "Receiver not found" });
+    const i = { username: t, email: a },
+      c = { username: s, email: e.email };
+    e.friends.push(i),
+      n.friends.push(c),
+      await e.save(),
+      await n.save(),
+      o.status(200).json({ message: "Friend added successfully" });
+  } catch (e) {
+    console.error(e), o.status(500).json({ error: "Internal server error" });
+  }
+}),
+  app.put("/updateposition", async (e, o) => {
+    try {
+      const { roomId1: s, userId: r, x: t, y: a } = e.body;
+      // console.log(s, r, t, a);
+      const n = await RoomModel.findOne({ roomId: s });
+      if (!n) return o.status(404).json({ error: "Room not found" });
+      const i = n.users.findIndex((e) => e === r);
+      if (-1 === i)
+        return o.status(404).json({ error: "User not found in the room" });
+      n.coordinates[i]
+        ? ((n.coordinates[i].x = t), (n.coordinates[i].y = a))
+        : (n.coordinates[i] = { email: r, x: t, y: a }),
+        await n.save(),
+        o.status(200).json({ message: "User position updated successfully" });
+    } catch (e) {
+      console.error(e), o.status(500).json({ error: "Internal server error" });
+    }
+  }),
+  app.get("/getusercoordinates", authenticateToken, async (e, o) => {
+    try {
+      const { roomId: s, userEmails: r } = e.query;
+      if (!Array.isArray(r))
+        return o.status(400).json({ error: "Invalid userEmails parameter" });
+      const t = await RoomModel.findOne({ roomId: s });
+      if (!t) return o.status(404).json({ error: "Room not found" });
+      const a = t.coordinates
+        .filter((e) => r.includes(e.email))
+        .map((e) => ({ x: e.x, y: e.y, email: e.email }));
+      if (0 === a.length)
+        return o
+          .status(404)
+          .json({ error: "No matching users found in the room" });
+      o.status(200).json(a);
+    } catch (e) {
+      console.error(e), o.status(500).json({ error: "Internal server error" });
+    }
+  }),
+  app.put("/notifications/:notificationId/mark-as-read", async (e, o) => {
+    const { notificationId: s } = e.params;
+    try {
+      const e = await Notification.findByIdAndUpdate(
+        s,
+        { read: !0 },
+        { new: !0 }
+      );
+      if (!e) return o.status(404).json({ error: "Notification not found" });
+      o.status(200).json({
+        message: "Notification marked as read",
+        notification: e,
+      });
+    } catch (e) {
+      console.error("Error marking notification as read:", e),
+        o.status(500).json({ error: "Internal server error" });
+    }
+  }),
+  app.post("/changecolor", authenticateToken, async (req, res) => {
+    const { user, hex } = req.body.det;
+    // console.log("COLOR UPDATED "+user+ hex);
+    try {
+      // Find the user by their email and update the color
+      const updatedUser = await User.findOneAndUpdate(
+        { email: user },
+        { chatcolor: hex },
+        { new: true } // This option returns the updated document
+      );
+
+      if (updatedUser) {
+        // User found and color updated
+        // console.log("COLOR UPDATED " + user + hex);
+        return res.status(200).json({ message: "Color updated successfully" });
+      } else {
+        // User not found
+        return res.status(404).json({ error: "User not found" });
+      }
+    } catch (e) {
+      console.error("Error updating color: " + e);
+      return res
+        .status(500)
+        .json({ error: "An error occurred while updating the color" });
+    }
+  }),
+  app.post("/changeusernamecolor", authenticateToken, async (req, res) => {
+    const { user, hex } = req.body.det;
+    // console.log("COLOR UPDATED "+user+ hex);
+    try {
+      // Find the user by their email and update the color
+      const updatedUser = await User.findOneAndUpdate(
+        { email: user },
+        { usernamecolor: hex },
+        { new: true } // This option returns the updated document
+      );
+
+      if (updatedUser) {
+        // User found and color updated
+        // console.log("COLOR UPDATED " + user + hex);
+        return res.sendStatus(200);
+      } else {
+        // User not found
+        return res.sendStatus(404);
+      }
+    } catch (e) {
+      console.error("Error updating color: " + e);
+      return res
+        .status(500)
+        .json({ error: "An error occurred while updating the color" });
+    }
+  }),
+  // app.post("/muteuser", async (e, o) => {
+  //     const { u: s, t: r, romid: t } = e.body.mutedata;
+  //     try {
+  //         const e = await mongoose.startSession();
+  //         e.startTransaction();
+  //         const o = await RoomModel.findOne({ roomId: t });
+  //         o && (o.muted.push(s), o.muted.push(r), await o.save({ session: e })), await e.commitTransaction(), e.endSession(), console.log("Muted Sucessfully!");
+  //         fetchAndSendUpdates(t)
+  //     } catch (e) {
+  //         console.log("error muting " + e);
+  //     }
+  // }),
+  app.post("/muteuser", authenticateToken, async (req, res) => {
+    const { u, t, roomid } = req.body.mutedata; // Assuming you have these values
+    // console.log(u,t);
+    try {
+      const rooms = await RoomModel.find({});
+
+      if (rooms && rooms.length > 0) {
+        for (const room of rooms) {
+          // Create a mute entry with the user and timestamp
+
+          room.muted.push(u);
+          room.muted.push(t);
+
+          room.save();
+          fetchAndSendUpdates(room.roomId);
+        }
+
+        // console.log("User muted in all rooms!");
+
+        res.status(200).send("User muted in all rooms!");
+      } else {
+        // console.log("No rooms found");
+        res.status(404).send("No rooms found");
+      }
+    } catch (error) {
+      console.log("Error muting: " + error);
+      res.status(500).send("Error muting: " + error);
+    }
+  });
+
+app.post("/blockuser", authenticateToken, async (req, res) => {
+  const { u: userToBlock, rx: roomId } = req.body.blockdata;
+
+  try {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    const room = await RoomModel.findOne({ roomId });
+
+    if (room) {
+      room.blocked.push(userToBlock);
+      await room.save({ session });
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // console.log("User Blocked Successfully!");
+
+    // Assuming this function sends updates to the relevant parties
+    // Make sure it's called at the appropriate place in your logic
+    fetchAndSendUpdates(roomId);
+
+    res.status(200).json({ message: "User Blocked Successfully!" });
+  } catch (error) {
+    console.error("Error Blocking User: " + error);
+
+    // Handle the error, roll back the transaction if necessary
+    res
+      .status(500)
+      .json({ error: "An error occurred while blocking the user." });
+  }
+});
+
+app.post("/createroom", authenticateToken, async (req, res) => {
+  const { usern, name, pic, bio, videoUrl, roomOwner, roomPrivacy, roomPass } =
+    req.body.roombody;
+  var mylink = getlink(videoUrl);
+  if (mylink == null || mylink == "") {
+    mylink = "";
+  } else {
+    mylink = "https://www.youtube.com/embed/" + mylink;
+  }
+
+  try {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    const coordinates = { usern, x: 215, y: 125 };
+    const roomId = generateRandomString();
+    const roomData = {
+      roomId: roomId,
+      name: name,
+      coordinates: coordinates,
+      badgeurl: pic,
+      videourl: mylink,
+      bio: bio,
+      mods: [usern], // Assuming room owner is also a moderator
+      roomOwner: roomOwner,
+      public: roomPrivacy,
+      password: roomPass,
+    };
+    const newRoom = await RoomModel(roomData);
+    await newRoom.save({ session });
+
+    const currentTime = moment()
+      .tz("Asia/Karachi")
+      .format("YYYY-MM-DD HH:mm:ss");
+    const initialMessages = {
+      room_id: roomId,
+      messages: [
+        { user_id: usern, content: "xxrp7", time: currentTime },
+        { user_id: usern, content: "xxrp7", time: currentTime },
+        { user_id: usern, content: "xxrp7", time: currentTime },
+      ],
+    };
+    const newMessage = new Message(initialMessages);
+    await newMessage.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({ stat: 200 });
+  } catch (error) {
+    console.log("Error Creating Room: " + error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}),
+  app.post("/updatebadge", authenticateToken, async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+      const { email: r, badgeUrl: t } = e.body.badgedata,
+        a = await User.findOneAndUpdate(
+          { email: r },
+          { badge: t },
+          { new: !0 }
+        ).session(s);
+      await s.commitTransaction(),
+        s.endSession(),
+        o.json({ message: "Badge updated successfully", user: a });
+    } catch (e) {
+      await s.abortTransaction(),
+        s.endSession(),
+        console.error(e),
+        o.status(500).json({ message: "An error occurred" });
+    }
+  }),
+  app.get("/notifications/:userId", authenticateToken, async (e, o) => {
+    try {
+      const { userId: s } = e.params,
+        r = await Notification.find({ recipient: s, read: !1 }).populate(
+          "sender"
+        );
+      o.status(200).json({ notifications: r });
+    } catch (e) {
+      console.error(e),
+        o.status(500).json({ message: "Internal server error" });
+    }
+  }),
+  app.post("/updateprofilepic", authenticateToken, async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+      const { useremail: r, profileurl: t } = e.body.imgdata,
+        a = await User.findOneAndUpdate(
+          { email: r },
+          { pic: t },
+          { new: !0 }
+        ).session(s);
+      await s.commitTransaction(),
+        s.endSession(),
+        o.json({ message: "Profile Pic updated successfully", user: a });
+      // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+    } catch (e) {
+      await s.abortTransaction(),
+        s.endSession(),
+        console.error(e),
+        o.status(500).json({ message: "An error occurred" });
+    }
+  }),
+  app.post("/loadbages", authenticateToken, async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+      const e = await badgeModel
+        .aggregate([{ $match: { badgeid: "123" } }, { $project: { _id: 0 } }])
+        .session(s);
+      await s.commitTransaction(), s.endSession(), o.json(e[0]);
+      // console.log("BADGES SENT");
+    } catch (e) {
+      await s.abortTransaction(),
+        s.endSession(),
+        console.error(e),
+        o.status(500).json({ message: "An error occurred" });
+    }
+  }),
+  app.post("/updateroom", authenticateToken, async (e, o) => {
+    const s = await mongoose.startSession();
+    try {
+      await s.withTransaction(async () => {
+        const {
+          roomid: r,
+          pic: t,
+          name: a,
+          bio: n,
+          videoUrl: i,
+        } = e.body.roombody;
+        // console.log('video: ',i);
+        var mylink = i;
+        if (!i.includes("embed")) {
+          if (mylink == null || mylink == "" || mylink.length <= 6) {
+            mylink = "";
+          } else {
+            mylink = getlink(i);
+
+            mylink = "https://www.youtube.com/embed/" + mylink;
+          }
+        }
+        // console.log('egge '+ mylink);
+
+        c = {};
+        if (
+          (t && (c.badgeurl = t),
+          a && (c.name = a),
+          n && (c.bio = n),
+          i && (c.videourl = mylink),
+          !(await RoomModel.findOneAndUpdate(
+            { roomId: r },
+            { $set: c },
+            { new: !0, session: s }
+          )))
+        )
+          throw new Error("Room not found");
+
+        // console.log("Updated Room Data");
+        o.json({ stat: 200 });
+      });
+    } catch (e) {
+      // console.log("Room Update Failed: " + e);
+    } finally {
+      s.endSession();
+    }
+  }),
+  //endpoint to fetch the messages between two users in the chatRoom
+  app.get(
+    "/messages/:senderId/:recepientId",
+    authenticateToken,
+    async (req, res) => {
+      try {
+        const { senderId, recepientId } = req.params;
+        console.log(senderId, recepientId);
+
+        const messages = await PersonalMessage.find({
+          $or: [
+            { senderId: senderId, recepientId: recepientId },
+            { senderId: recepientId, recepientId: senderId },
+          ],
+        }).sort({ timestamp: 1 });
+
+        res.json(messages);
+      } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    }
+  );
+
+app.post("/deleteroom", authenticateToken, async (e, o) => {
+  const { roomid: s } = e.body;
+  try {
+    if (!(await RoomModel.findOneAndDelete({ roomId: s })))
+      return o.status(404).json({ error: "Room not found" });
+    // console.log("Delete Room Success"),
+    o.json({ s: 200 });
+  } catch (e) {
+    console.log("Room Deletion Failed: " + e),
+      o.status(500).json({ error: "Room Deletion Failed" });
+  }
+});
+app.post("/removeprofilepic", authenticateToken, async (e, o) => {
+  const s = await mongoose.startSession();
+  s.startTransaction();
+  try {
+    const { user } = e.body.a,
+      a = await User.findOneAndUpdate(
+        { email: user },
+        { pic: "https://cdn-icons-png.flaticon.com/512/3177/3177440.png" },
+        { new: !0 }
+      ).session(s);
+    await s.commitTransaction(),
+      s.endSession(),
+      // console.log("PROFILE REMOVED"),
+      o.sendStatus(200);
+    // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+  } catch (e) {
+    await s.abortTransaction(),
+      s.endSession(),
+      console.error(e),
+      o.status(500).json({ message: "An error occurred" });
+  }
+}),
+  app.post("/removebackpic", authenticateToken, async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+      const { user } = e.body.a,
+        a = await User.findOneAndUpdate(
+          { email: user },
+          {
+            backgroundPic:
+              "https://as2.ftcdn.net/v2/jpg/01/68/74/87/1000_F_168748763_Mdv7zO7dxuECMzItERhPzWhVJSaORTKd.jpg",
+          },
+          { new: !0 }
+        ).session(s);
+      await s.commitTransaction(),
+        s.endSession(),
+        // console.log("BACKGROUND REMOVED"),
+        o.sendStatus(200);
+      // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+    } catch (e) {
+      await s.abortTransaction(),
+        s.endSession(),
+        console.error(e),
+        o.status(500).json({ message: "An error occurred" });
+    }
+  }),
+  app.post("/removebio", authenticateToken, async (e, o) => {
+    const s = await mongoose.startSession();
+    s.startTransaction();
+    try {
+      const { user } = e.body.a,
+        a = await User.findOneAndUpdate(
+          { email: user },
+          { bio: "Hi i am ChatZyr User!" },
+          { new: !0 }
+        ).session(s);
+      await s.commitTransaction(),
+        s.endSession(),
+        // console.log("Bio REMOVED"),
+        o.sendStatus(200);
+      // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+    } catch (e) {
+      await s.abortTransaction(),
+        s.endSession(),
+        console.error(e),
+        o.status(500).json({ message: "An error occurred" });
+    }
+  }),
+  app.delete("/deleteAccount/:email", async (req, res) => {
+    const { email } = req.params;
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Delete the user document from the User collection
+      await User.findOneAndDelete({ email }).session(session);
+
+      // Delete messages associated with the user from the Message model
+      // const deletedMessages = await Message.deleteMany({ user_id: email }).session(session);
+      // console.log(Deleted ${deletedMessages.deletedCount} documents.);
+      // console.log(deletedMessages);
+
+      // Delete notifications sent to or from the user from the Notification model
+      await Notification.deleteMany({
+        $or: [{ sender: email }, { recipient: email }],
+      }).session(session);
+
+      const modDocument = await Mods.findOne({
+        $or: [{ mod1: email }, { mod2: email }],
+      });
+
+      if (modDocument) {
+        // Remove the user from either mod1 or mod2
+        if (modDocument.mod1.includes(email)) {
+          modDocument.mod1 = modDocument.mod1.filter((user) => user !== email);
+        } else {
+          modDocument.mod2 = modDocument.mod2.filter((user) => user !== email);
+        }
+
+        // Save the updated document
+        await modDocument.save();
+
+        // console.log(Deleted user: ${email} from mods);
+        // res.status(200).send(Deleted user: ${userToBeDeleted} from mods);
+      } else {
+        // console.log(User not found in mods);
+        // res.status(404).send('User not found in mods`);
+      }
+      removeUserFromFriends(email);
+      deletePerMessages(email);
+      const result = await deleteMessages(email);
+
+      deleteCoordinates(email);
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      // Respond with a success message
+
+      // console.log("User deleted successfully.");
+      res.status(200).json({
+        message: "User account and associated data deleted successfully.",
+      });
+    } catch (error) {
+      // Rollback the transaction in case of an error
+      await session.abortTransaction();
+      session.endSession();
+      console.error(error);
+      res
+        .status(500)
+        .json({ error: "An error occurred while deleting the user account." });
+    }
+  });
+
+const normalizeString = (str) => {
+  return str
+    .replace(/[\s\W_]+/g, "") // Remove spaces, special characters
+    .toLowerCase(); // Convert to lowercase
+};
+
+app.get("/search", authenticateToken, async (req, res) => {
+  const { query } = req.query;
+
+  if (!query) {
+    return res.status(400).json({ error: "Query parameter is required" });
+  }
+
+  const normalizedQuery = normalizeString(query);
+
+  try {
+    const users = await User.find({});
+    const results = users.filter((user) => {
+      const normalizedUsername = normalizeString(user.username);
+      return normalizedUsername.includes(normalizedQuery);
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/user", authenticateToken, async (req, res) => {
+  try {
+    const userEmail = req.query.email;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Find the user by their email in the MongoDB database
+    const user = await User.findOne({ email: userEmail });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Return the user details in the response
+    res.status(200).json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log("Sockets Server listening on port " + PORT);
+});
