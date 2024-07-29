@@ -41,45 +41,45 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
 
 var nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
-// var admin = require("firebase-admin");
+var admin = require("firebase-admin");
 
-// var serviceAccount = require("./chatzyr-adminNotifs.json");
+var serviceAccount = require("./chatzyr-adminNotifs.json");
 
-// admin.initializeApp({
-//   credential: admin.credential.cert(serviceAccount)
-// });
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
-// const sendPushNotification = async (registrationToken,message)=>{
-//   const sendMessage ={
-//     token:registrationToken,
-//     notification:{
-//       title:"Chatzyr",
-//       body:"Body test"
-//     },
-//     data:{
-//       key1:'value1',
-//       key2:'value2'
-//     },
-//     android:{
-//       priority: "high",
-//     },
-//     apns:{
-//       payload :{
-//         aps:{
-//           badge:42
-//         }
-//       }
-//     }
-//   };
+const sendPushNotification = async (registrationToken,message)=>{
+  const sendMessage ={
+    token:registrationToken,
+    notification:{
+      title:"Chatzyr",
+      body:"Body test"
+    },
+    data:{
+      key1:'value1',
+      key2:'value2'
+    },
+    android:{
+      priority: "high",
+    },
+    apns:{
+      payload :{
+        aps:{
+          badge:42
+        }
+      }
+    }
+  };
 
-//   admin.messaging().send(sendMessage).then(response => {
-//     console.log('Notif sent', response);
-//   })
-//   .catch(error=>{
-//     console.error("Error sending message:",error);
-//   })
+  admin.messaging().send(sendMessage).then(response => {
+    console.log('Notif sent', response);
+  })
+  .catch(error=>{
+    console.error("Error sending message:",error)
+  })
 
-// }
+}
 
 async function addLikesField() {
   try {
