@@ -11,4 +11,4 @@ const badgeSchema1 = new mongoose.Schema({
 
 const trans = mongoose.model('transactions', badgeSchema1);
 
-module.exports = trans;
+module.exports = trans;

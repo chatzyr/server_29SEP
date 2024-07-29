@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require("mongoose");
 const RoomModel = require('../models/roomsdata'); // Adjust the path as necessary
+const PicModel = require('../models/backgroundpics');
 const User = mongoose.model("User");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
@@ -9,7 +10,7 @@ const jwt = require("jsonwebtoken");
 router.post('/like', async (req, res) => {
   // console.log('room like req');
   const { roomId, userEmail } = req.body;
-  // console.log(req.body);
+  console.log(req.body);
 
   try {
     // Find the room by roomId
@@ -77,6 +78,68 @@ router.post("/userData", async (req, res) => {
       message: "Error In Login Callcback",
       error,
     });
+  }
+});
+router.post("/fetchPictures", async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const pictures = await PicModel
+      .aggregate([{ $match: { backgroundID: "123" } }, { $project: { _id: 0 } }])
+      .session(session);
+
+    await session.commitTransaction();
+    session.endSession();
+    res.json(pictures[0]);
+    // console.log("PICTURES SENT");
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
+    res.status(500).json({ message: "An error occurred" });
+  }
+});
+
+// router.post("/addPictures", async (req, res) => {
+//   const { backgroundID, free, vip } = req.body;
+//   const session = await mongoose.startSession();
+//   session.startTransaction();
+//   try {
+//     const newPicture = new PicModel({ backgroundID, free, vip });
+//     await newPicture.save({ session });
+//     await session.commitTransaction();
+//     session.endSession();
+//     res.status(201).json({ message: "Pictures added successfully" });
+//   } catch (error) {
+//     await session.abortTransaction();
+//     session.endSession();
+//     console.error(error);
+//     res.status(500).json({ message: "An error occurred" });
+//   }
+// });
+
+// Route to update the BackImage of a user
+router.put('/updateBackImage', async (req, res) => {
+  const { email, backImageUrl } = req.body;
+
+  if (!email || !backImageUrl) {
+    return res.status(400).send({ message: 'Email and new BackImage are required' });
+  }
+
+  try {
+    const user = await User.findOneAndUpdate(
+      { email: email },
+      { BackImage: backImageUrl },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).send({ message: 'User not found' });
+    }
+
+    res.send({ message: 'BackImage updated successfully', user });
+  } catch (error) {
+    res.status(500).send({ message: 'Server error', error });
   }
 });
 

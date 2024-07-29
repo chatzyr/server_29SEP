@@ -1,4 +1,5 @@
 const { Mutex } = require("async-mutex");
+const axios = require('axios');
 const roomMutex = new Mutex();
 const express = require("express"),
   mongoose = require("mongoose"),
@@ -40,6 +41,45 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
 
 var nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
+var admin = require("firebase-admin");
+
+var serviceAccount = require("./chatzyr-adminNotifs.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const sendPushNotification = async (registrationToken,message)=>{
+  const sendMessage ={
+    token:registrationToken,
+    notification:{
+      title:"Chatzyr",
+      body:"Body test"
+    },
+    data:{
+      key1:'value1',
+      key2:'value2'
+    },
+    android:{
+      priority: "high",
+    },
+    apns:{
+      payload :{
+        aps:{
+          badge:42
+        }
+      }
+    }
+  };
+
+  admin.messaging().send(sendMessage).then(response => {
+    console.log('Notif sent', response);
+  })
+  .catch(error=>{
+    console.error("Error sending message:",error);
+  })
+
+}
 
 async function addLikesField() {
   try {
@@ -346,7 +386,91 @@ async function verifyOtp(u, o) {
     return 0; // Handle the error appropriately
   }
 }
+const updateTransactions = async (ids, email) => {
+  const externalServerUrl = "https://api.paypro.com.pk/v2/ppro/auth"; // Replace with the actual URL
 
+  // Send POST request to the external server
+  const response = await axios.post(externalServerUrl, {
+    clientid: "HjuCVG39MjdTrzS",
+    clientsecret: "lpk8rmjTgmjfKZ0",
+  });
+
+  const token =
+    response.headers["authorization"] ||
+    response.headers["Authorization"] ||
+    response.headers["token"]; // Case-insensitive
+  const getorderstatus = "https://api.paypro.com.pk/v2/ppro/ggos"; // Replace with the actual URL
+
+  ids.forEach(async (element) => {
+    // console.log(element);
+    const params = {
+      Username: "CHATZYR",
+      Cpayid: element.payproID,
+    };
+
+    try {
+      // Send GET request to the external server with headers and params
+      const response = await axios.get(getorderstatus, {
+        headers: {
+          token: `${token}`, // Add token to headers
+          "Content-Type": "application/json", // Set the content type to JSON
+        },
+        params: params, // Send params as query parameters
+      });
+      if (response.data.OrderStatus == "paid") {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+          // Update user balance
+          const user = await User.findOne({ email: email }).session(session);
+          if (!user) {
+            throw new Error("User not found");
+          }
+
+          console.log(user.balance);
+          console.log(response.data[1].OrderAmountPaid);
+          console.log(typeof response.data[1].OrderAmountPaid);
+          user.balance =
+            (user.balance || 0) + parseInt(response.data[1].OrderAmountPaid);
+          await user.save({ session });
+
+          // Update transaction status
+          const transaction = await TransactionModel.findOne({
+            email: email,
+            payproID: element.payproID,
+          }).session(session);
+          if (!transaction) {
+            throw new Error("Transaction not found");
+          }
+
+          transaction.status = "Paid";
+          await transaction.save({ session });
+
+          // Commit transaction
+          await session.commitTransaction();
+          session.endSession();
+
+          console.log(
+            "User balance and transaction status updated successfully"
+          );
+        } catch (error) {
+          // Abort transaction on error
+          await session.abortTransaction();
+          session.endSession();
+
+          console.error("Transaction failed:", error);
+        }
+      }
+
+      console.log(response.data); // Log the response data
+    } catch (error) {
+      console.error(
+        "Error:",
+        error.response ? error.response.data : error.message
+      );
+    }
+  });
+};
 function generateRandomString() {
   let e = "";
   for (let o = 0; o < 7; o++) {
@@ -740,6 +864,7 @@ async function getfromdb(e, x) {
 
 var roomids = [];
 async function updateCoordinatesWithRetry(roomId, userId, x, y) {
+  // console.log('coord');
   const room = await RoomModel.findOne({ roomId });
 
   if (!room) {
@@ -1458,20 +1583,94 @@ app.post("/resetpassword", async (req, res) => {
 });
 app.post("/storesms", async (req, res) => {
   // console.log("HERE");
+  var temp='';
+  try{
   const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");
+  const date = moment().tz("Asia/Karachi").format("DD/MM/YYYY");
 
-  for (var i = 0; i < req.body.length; i++) {
-    var xx = req.body[i];
-    var trans = xx["Trx ID"];
-    trans = trans.replace("Trx ID ", "");
-    const a = { transaction_id: trans, amount: xx["Amount"], time: time };
-    const x = new TransactionModel(a);
-    x.save().catch((e) => {
-      if (e.message.includes("duplicate key")) {
+
+
+
+
+  const externalServerUrl = 'https://api.paypro.com.pk/v2/ppro/auth'; // Replace with the actual URL
+
+  // Send POST request to the external server
+  const response = await axios.post(externalServerUrl, {
+     "clientid": "HjuCVG39MjdTrzS",
+    "clientsecret": "lpk8rmjTgmjfKZ0"
+  });
+  
+  const token = response.headers['authorization'] || response.headers['Authorization'] || response.headers['token']; // Case-insensitive
+
+
+  const createOrderUrl = 'https://api.paypro.com.pk/v2/ppro/co'; // Replace with the actual URL
+
+  // Prepare the request body
+  const requestData = [
+    {
+        "MerchantId": "CHATZYR"
+    },
+    {
+        "OrderNumber": req.body.orderNo,
+        "OrderAmount": req.body.amount,
+        "OrderDueDate": date,
+        "OrderType": "Service",
+        "IssueDate": date,
+        "OrderExpireAfterSeconds": "900",
+        "CustomerName": req.body.name,
+        "CustomerMobile": req.body.phone,
+        "CustomerEmail":req.body.email,
+        "CustomerAddress": req.body.address
+    }
+]
+  // console.log(token)
+  try {
+    // Send POST request to the external server with headers
+    const response = await axios.post(createOrderUrl, requestData, {
+      headers: {
+        'token': `${token}`, // Add token to headers
+        'Content-Type': 'application/json' // Set the content type to JSON if needed
       }
     });
+  
+    // Handle response
+    // console.log('Response:', response.data );
+    if(response.data[0].Status!= '00')
+    {
+      console.log(response.data);
+res.sendStatus(400);
+return 0
+    }
+    temp= response.data[1]
+
+
+
+  } catch (error) {
+    // Handle error
+    res.sendStatus(400);
+    console.error('Error:', error);
+    return 0;
   }
-  res.sendStatus(200);
+
+
+
+  const transaction = new TransactionModel({
+    email: req.body.email,
+    transaction_id: req.body.orderNo,
+    amount: req.body.amount,
+    time: time,
+    status: 'pending',
+    payproID: temp.PayProId
+  });
+  await transaction.save();
+  res.status(200).json({link: temp.Click2Pay});
+
+}
+catch(e){
+  res.sendStatus(400);
+  console.log("Sorry cant add transcation"+e);
+}
+ 
 });
 
 app.get(
@@ -1562,7 +1761,15 @@ app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
   try {
     const email = req.params.email;
 
+    const ids = await TransactionModel.find({
+      email: email,
+      status: "pending",
+    });
+    // console.log(ids);
+
+    await updateTransactions(ids, email);
     // Find all transactions with the given email and status "done"
+
     const transactions = await TransactionModel.find({ email });
 
     if (transactions.length === 0) {
@@ -1705,13 +1912,14 @@ app.get("/users/:email/profile", authenticateToken, async (e, o) => {
     try {
       // console.log(req.body);
       const userEmail = req.body.email;
-      const { username, bio } = req.body;
+      const { username, bio, userStatus } = req.body;
 
       const user = await User.findOne({ email: userEmail });
       if (!user) return res.status(404).json({ message: "User not found" });
 
       user.username = username;
       user.bio = bio;
+      user.status = userStatus;
       await user.save();
 
       res.status(200).json({ message: "User updated successfully" });
