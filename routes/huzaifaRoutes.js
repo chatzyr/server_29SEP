@@ -145,7 +145,7 @@ router.put('/updateBackImage', async (req, res) => {
 
 router.get('/balance/:email', async (req, res) => {
   try {
-    const { email } = req.params.email;
+    const { email } = req.params;
     console.log(email);
     // Find the user by email
     const user = await User.findOne({ email });
