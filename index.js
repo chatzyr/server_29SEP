@@ -29,7 +29,7 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
   Notification = require("./models/notifications"),
   CoordinateModel = require("./models/coordinates"),
   PackageModel = require("./models/vip");
-(Otp = require("./models/otp")),
+  (Otp = require("./models/otp")),
   (TransactionModel = require("./models/transactions")),
   (PaymentDetailsModel = require("./models/PaymentDetails.Js")),
   (ShopDetails = require("./models/shopdetails")),
@@ -1758,6 +1758,7 @@ app.get("/api/payment-details", authenticateToken, async (req, res) => {
 });
 
 app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
+  console.log('req');
   try {
     const email = req.params.email;
 
