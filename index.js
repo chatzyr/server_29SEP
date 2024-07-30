@@ -1787,24 +1787,6 @@ app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/balance/:email', async (req, res) => {
-  try {
-    const { email } = req.params.email;
-    console.log(email);
-    // Find the user by email
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Return the user's balance
-    res.status(200).json({ balance: user.balance });
-  } catch (error) {
-    console.error('Error fetching user balance:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
 function authenticateToken(req, res, next) {
   const token = req.headers["authorization"];
   // console.log("SERVER HD "+JSON.stringify(req.headers));
