@@ -23,7 +23,8 @@ const roomSchema = new mongoose.Schema({
     likedBy: [{ type: String, default:''}],
     roomOwner:{type: String, default: ''},
     public:{type: Boolean, default: true},
-    password:{type:String,default:'123'}
+    password:{type:String,default:'123'},
+    bubble:{type:Boolean,default:false},
 });
 
 

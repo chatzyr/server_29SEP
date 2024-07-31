@@ -142,6 +142,33 @@ router.put('/updateBackImage', async (req, res) => {
     res.status(500).send({ message: 'Server error', error });
   }
 });
+router.post('/toggle-bubble/:roomId', async (req, res) => {
+  try {
+      const { roomId } = req.params;
+
+      // Find the room and get its current bubble value
+      const room = await RoomModel.findOne({ roomId });
+
+      if (!room) {
+          return res.status(404).json({ message: 'Room not found' });
+      }
+
+      // Toggle the bubble value
+      room.bubble = !room.bubble;
+
+      // Save the updated room
+      await room.save();
+
+      res.status(200).json({ 
+          message: 'Bubble value toggled successfully', 
+          newBubbleValue: room.bubble 
+      });
+
+  } catch (error) {
+      console.error('Error toggling bubble value:', error);
+      res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 router.get('/balance/:email', async (req, res) => {
   try {

@@ -23,9 +23,13 @@ const userSchema = new mongoose.Schema({
     friends: [friendSchema],
     chatcolor: { type: String, default: '#FFFFFF' }, // Added chatcolor field
     usernamecolor: { type: String, default: '#FF0000' }, // Added chatcolor field
+    biocolor: { type: String, default: '#FF0000' }, // Added chatcolor field
+    statuscolor: { type: String, default: '#FF0000' }, // Added chatcolor field
     balance:{type: Number, default: 0},
     status:{type:String,default:'Hey! This is my Status!!!'},
     BackImage: { type: String, default: 'https://raw.githubusercontent.com/chatzyr/chatzyr-background-Images/main/free/default.png' },
+    fcmToken:{type:String,default:'token'},
+
 });
 
 const User = mongoose.model("User", userSchema);
