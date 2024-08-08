@@ -2325,7 +2325,7 @@ app.post("/createroom", authenticateToken, async (req, res) => {
   try {
     const session = await mongoose.startSession();
     session.startTransaction();
-    const coordinates = { usern, x: 215, y: 125 };
+    const coordinates = { email:usern, x: 215, y: 125 };
     const roomId = generateRandomString();
     const roomData = {
       roomId: roomId,

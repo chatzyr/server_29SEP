@@ -189,4 +189,69 @@ router.get('/balance/:email', async (req, res) => {
   }
 });
 
+router.put('/update-statuscolor/:email', async (req, res) => {
+  console.log('stats');
+  
+  try {
+    const { email } = req.params;
+    const { color } = req.body;
+
+    console.log(email,color);
+    
+
+    if (!color) {
+      return res.status(400).json({ message: 'statuscolor is required' });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { email: email }, // Change this line
+      { statuscolor: color },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Status color updated successfully', user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating status color', error: error.message });
+  }
+});
+
+// Route to update biocolor
+router.put('/update-biocolor/:email', async (req, res) => {
+  ;
+  
+  try {
+    const { email } = req.params;
+    const { color } = req.body;
+    console.log(email,color);
+
+    if (!color) {
+      console.log('cc');
+      
+      return res.status(400).json({ message: 'biocolor is required' });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { email: email },
+      { biocolor:color },
+      { new: true }
+    );
+    
+    if (!updatedUser) {
+      console.log('ll');
+      
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Bio color updated successfully', user: updatedUser });
+  } catch (error) {
+    console.log('ee',error.message);
+    
+    res.status(500).json({ message: 'Error updating bio color', error: error.message });
+  }
+});
+
 module.exports = router;

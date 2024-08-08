@@ -1,13 +1,12 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-    email: {type: String, unique:true},
+    email: {type: String,unique:true},
     x: { type: Number, default: 215 },
     y: { type: Number, default: 125 },
   });
 
 
-  userSchema.index({ email: 1 }, { unique: true });
 const roomSchema = new mongoose.Schema({
     roomId: { type: String, required: true, unique: true },
     users: { type: [String], default: [''] },
