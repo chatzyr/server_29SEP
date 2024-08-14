@@ -58,7 +58,7 @@ router.post("/userData", async (req, res) => {
       });
     }
     const payload = {
-      userId: user._id,
+      email: user._id,
     };
   
     // Generate the token with a secret key and expiration time
@@ -251,6 +251,52 @@ router.put('/update-biocolor/:email', async (req, res) => {
     console.log('ee',error.message);
     
     res.status(500).json({ message: 'Error updating bio color', error: error.message });
+  }
+});
+
+router.post('/save-fcm-token', async (req, res) => {
+  try {
+    
+      const { email, fcmToken } = req.body;
+      console.log('save fcm',req.body);
+      
+
+      if (!email || !fcmToken) {
+          return res.status(400).json({ message: 'User ID and FCM token are required' });
+      }
+
+      const updatedUser = await User.findOneAndUpdate(
+        { email: email }, 
+          { fcmToken: fcmToken },
+          { new: true }
+      );
+
+      if (!updatedUser) {
+          return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.status(200).json({ message: 'FCM token saved successfully', user: updatedUser });
+  } catch (error) {
+      console.error('Error saving FCM token:', error);
+      res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Route to retrieve FCM token
+router.get('/get-fcm-token/:email', async (req, res) => {
+  try {
+      const email = req.params.email;
+
+      const user = await User.find({email:email});
+
+      if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.status(200).json({ fcmToken: user.fcmToken });
+  } catch (error) {
+      console.error('Error retrieving FCM token:', error);
+      res.status(500).json({ message: 'Internal server error' });
   }
 });
 

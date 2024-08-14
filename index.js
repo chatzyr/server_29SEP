@@ -1,5 +1,5 @@
 const { Mutex } = require("async-mutex");
-const axios = require('axios');
+const axios = require("axios");
 const roomMutex = new Mutex();
 const express = require("express"),
   mongoose = require("mongoose"),
@@ -29,7 +29,7 @@ const { mongoUrl: mongoUrl } = require("./dbConnection"),
   Notification = require("./models/notifications"),
   CoordinateModel = require("./models/coordinates"),
   PackageModel = require("./models/vip");
-  (Otp = require("./models/otp")),
+(Otp = require("./models/otp")),
   (TransactionModel = require("./models/transactions")),
   (PaymentDetailsModel = require("./models/PaymentDetails.Js")),
   (ShopDetails = require("./models/shopdetails")),
@@ -46,40 +46,42 @@ var admin = require("firebase-admin");
 var serviceAccount = require("./chatzyr-adminNotifs.json");
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
-const sendPushNotification = async (registrationToken,message)=>{
-  const sendMessage ={
-    token:registrationToken,
-    notification:{
-      title:"Chatzyr",
-      body:"Body test"
+const sendPushNotification = async (registrationToken, message) => {
+  const sendMessage = {
+    token: registrationToken,
+    notification: {
+      title: "Chatzyr",
+      body: "Body test",
     },
-    data:{
-      key1:'value1',
-      key2:'value2'
+    data: {
+      key1: "value1",
+      key2: "value2",
     },
-    android:{
+    android: {
       priority: "high",
     },
-    apns:{
-      payload :{
-        aps:{
-          badge:42
-        }
-      }
-    }
+    apns: {
+      payload: {
+        aps: {
+          badge: 42,
+        },
+      },
+    },
   };
 
-  admin.messaging().send(sendMessage).then(response => {
-    console.log('Notif sent', response);
-  })
-  .catch(error=>{
-    console.error("Error sending message:",error)
-  })
-
-}
+  admin
+    .messaging()
+    .send(sendMessage)
+    .then((response) => {
+      console.log("Notif sent", response);
+    })
+    .catch((error) => {
+      console.error("Error sending message:", error);
+    });
+};
 
 async function addLikesField() {
   try {
@@ -981,6 +983,8 @@ wss.on("connection", (e) => {
             // Send the notifications to the client
             e.send(JSON.stringify({ notifications }));
             const onlineusers = Array.from(activeUsers.keys());
+            console.log(onlineusers);
+
             e.send(JSON.stringify({ onlineusers }));
           } catch (error) {
             console.error("Error fetching notifications:", error);
@@ -1212,6 +1216,9 @@ wss.on("connection", (e) => {
       res.status(500).json({ error: "Internal server error" });
     }
   });
+app.get("/loginauthcheck", authenticateToken, async (req, res) => {
+  res.sendStatus(200);
+});
 app.put("/messages/mark-all-read/:user1/:user2", async (req, res) => {
   try {
     const { user1, user2 } = req.params;
@@ -1583,94 +1590,83 @@ app.post("/resetpassword", async (req, res) => {
 });
 app.post("/storesms", async (req, res) => {
   // console.log("HERE");
-  var temp='';
-  try{
-  const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");
-  const date = moment().tz("Asia/Karachi").format("DD/MM/YYYY");
-
-
-
-
-
-  const externalServerUrl = 'https://api.paypro.com.pk/v2/ppro/auth'; // Replace with the actual URL
-
-  // Send POST request to the external server
-  const response = await axios.post(externalServerUrl, {
-     "clientid": "HjuCVG39MjdTrzS",
-    "clientsecret": "lpk8rmjTgmjfKZ0"
-  });
-  
-  const token = response.headers['authorization'] || response.headers['Authorization'] || response.headers['token']; // Case-insensitive
-
-
-  const createOrderUrl = 'https://api.paypro.com.pk/v2/ppro/co'; // Replace with the actual URL
-
-  // Prepare the request body
-  const requestData = [
-    {
-        "MerchantId": "CHATZYR"
-    },
-    {
-        "OrderNumber": req.body.orderNo,
-        "OrderAmount": req.body.amount,
-        "OrderDueDate": date,
-        "OrderType": "Service",
-        "IssueDate": date,
-        "OrderExpireAfterSeconds": "900",
-        "CustomerName": req.body.name,
-        "CustomerMobile": req.body.phone,
-        "CustomerEmail":req.body.email,
-        "CustomerAddress": req.body.address
-    }
-]
-  // console.log(token)
+  var temp = "";
   try {
-    // Send POST request to the external server with headers
-    const response = await axios.post(createOrderUrl, requestData, {
-      headers: {
-        'token': `${token}`, // Add token to headers
-        'Content-Type': 'application/json' // Set the content type to JSON if needed
-      }
+    const time = moment().tz("Asia/Karachi").format("YYYY-MM-DD HH:mm:ss");
+    const date = moment().tz("Asia/Karachi").format("DD/MM/YYYY");
+
+    const externalServerUrl = "https://api.paypro.com.pk/v2/ppro/auth"; // Replace with the actual URL
+
+    // Send POST request to the external server
+    const response = await axios.post(externalServerUrl, {
+      clientid: "HjuCVG39MjdTrzS",
+      clientsecret: "lpk8rmjTgmjfKZ0",
     });
-  
-    // Handle response
-    // console.log('Response:', response.data );
-    if(response.data[0].Status!= '00')
-    {
-      console.log(response.data);
-res.sendStatus(400);
-return 0
+
+    const token =
+      response.headers["authorization"] ||
+      response.headers["Authorization"] ||
+      response.headers["token"]; // Case-insensitive
+
+    const createOrderUrl = "https://api.paypro.com.pk/v2/ppro/co"; // Replace with the actual URL
+
+    // Prepare the request body
+    const requestData = [
+      {
+        MerchantId: "CHATZYR",
+      },
+      {
+        OrderNumber: req.body.orderNo,
+        OrderAmount: req.body.amount,
+        OrderDueDate: date,
+        OrderType: "Service",
+        IssueDate: date,
+        OrderExpireAfterSeconds: "900",
+        CustomerName: req.body.name,
+        CustomerMobile: req.body.phone,
+        CustomerEmail: req.body.email,
+        CustomerAddress: req.body.address,
+      },
+    ];
+    // console.log(token)
+    try {
+      // Send POST request to the external server with headers
+      const response = await axios.post(createOrderUrl, requestData, {
+        headers: {
+          token: `${token}`, // Add token to headers
+          "Content-Type": "application/json", // Set the content type to JSON if needed
+        },
+      });
+
+      // Handle response
+      // console.log('Response:', response.data );
+      if (response.data[0].Status != "00") {
+        console.log(response.data);
+        res.sendStatus(400);
+        return 0;
+      }
+      temp = response.data[1];
+    } catch (error) {
+      // Handle error
+      res.sendStatus(400);
+      console.error("Error:", error);
+      return 0;
     }
-    temp= response.data[1]
 
-
-
-  } catch (error) {
-    // Handle error
+    const transaction = new TransactionModel({
+      email: req.body.email,
+      transaction_id: req.body.orderNo,
+      amount: req.body.amount,
+      time: time,
+      status: "pending",
+      payproID: temp.PayProId,
+    });
+    await transaction.save();
+    res.status(200).json({ link: temp.Click2Pay });
+  } catch (e) {
     res.sendStatus(400);
-    console.error('Error:', error);
-    return 0;
+    console.log("Sorry cant add transcation" + e);
   }
-
-
-
-  const transaction = new TransactionModel({
-    email: req.body.email,
-    transaction_id: req.body.orderNo,
-    amount: req.body.amount,
-    time: time,
-    status: 'pending',
-    payproID: temp.PayProId
-  });
-  await transaction.save();
-  res.status(200).json({link: temp.Click2Pay});
-
-}
-catch(e){
-  res.sendStatus(400);
-  console.log("Sorry cant add transcation"+e);
-}
- 
 });
 
 app.get(
@@ -1758,7 +1754,7 @@ app.get("/api/payment-details", authenticateToken, async (req, res) => {
 });
 
 app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
-  console.log('req');
+  console.log("req");
   try {
     const email = req.params.email;
 
@@ -2319,14 +2315,18 @@ app.post("/createroom", authenticateToken, async (req, res) => {
   if (mylink == null || mylink == "") {
     mylink = "";
   } else {
-    mylink = "https://www.youtube.com/embed/" + mylink;
+    if (!mylink.includes("backblaze")) {
+      mylink = "https://www.youtube.com/embed/" + mylink;
+    }
   }
 
   try {
     const session = await mongoose.startSession();
     session.startTransaction();
-    const coordinates = { email:usern, x: 215, y: 125 };
+
+    const coordinates = { email: usern, x: 215, y: 125 };
     const roomId = generateRandomString();
+
     const roomData = {
       roomId: roomId,
       name: name,
@@ -2447,13 +2447,16 @@ app.post("/createroom", authenticateToken, async (req, res) => {
         } = e.body.roombody;
         // console.log('video: ',i);
         var mylink = i;
-        if (!i.includes("embed")) {
-          if (mylink == null || mylink == "" || mylink.length <= 6) {
-            mylink = "";
-          } else {
-            mylink = getlink(i);
 
-            mylink = "https://www.youtube.com/embed/" + mylink;
+        if (!i.includes("backblaze")) {
+          if (!i.includes("embed")) {
+            if (mylink == null || mylink == "" || mylink.length <= 6) {
+              mylink = "";
+            } else {
+              mylink = getlink(i);
+
+              mylink = "https://www.youtube.com/embed/" + mylink;
+            }
           }
         }
         // console.log('egge '+ mylink);
