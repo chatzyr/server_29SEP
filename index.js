@@ -983,7 +983,7 @@ wss.on("connection", (e) => {
             // Send the notifications to the client
             e.send(JSON.stringify({ notifications }));
             const onlineusers = Array.from(activeUsers.keys());
-            console.log(onlineusers);
+            // console.log(onlineusers);
 
             e.send(JSON.stringify({ onlineusers }));
           } catch (error) {
