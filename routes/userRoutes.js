@@ -103,7 +103,7 @@ const createToken = (userId) => {
   };
 
   // Generate the token with a secret key and expiration time
-  const token = jwt.sign(payload, "Q$r2K6W8n!jCW%Zk", { expiresIn: "1h" });
+  const token = jwt.sign(payload, "Q$r2K6W8n!jCW%Zk", { expiresIn: "7d" });
 
   return token;
 };
@@ -122,7 +122,7 @@ router.post("/login", async (req, res) => {
     }
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(200).send({
+      return res.status(401).send({
         success: false,
         message: "email is not registerd",
       });
@@ -141,7 +141,7 @@ router.post("/login", async (req, res) => {
       success: true,
       messgae: "login successfully",
       user,
-      email: {email},
+      email: { email },
       token,
     });
   } catch (error) {

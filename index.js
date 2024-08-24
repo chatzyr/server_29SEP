@@ -43,7 +43,7 @@ var nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
 var admin = require("firebase-admin");
 
-var serviceAccount = require("./chatzyr-adminNotifs.json");
+var serviceAccount = require("./chatzyr-15d55-firebase-adminsdk-rlnk4-15bdb6d62a.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -54,7 +54,7 @@ const sendPushNotification = async (registrationToken, message) => {
     token: registrationToken,
     notification: {
       title: "Chatzyr",
-      body: "Body test",
+      body: message,
     },
     data: {
       key1: "value1",
@@ -969,6 +969,8 @@ wss.on("connection", (e) => {
         } else if (s.action === "getNotifications") {
           // Handle the 'getNotifications' action here
           const { recipientEmail } = s.data;
+          // console.log(s);
+          
           // console.log("ALIVE REQ "+ recipientEmail);
           activeUsers.set(recipientEmail, {
             connection: e,
@@ -1937,6 +1939,11 @@ app.post(
     try {
       // Check if the logged-in user has already liked the profile of the user with likedUserId
       const likedUser = await User.findOne({ email: likedUserId });
+      const logInUser = await User.findOne({ email: loggedInUser });
+      // console.log(likedUser.fcmToken);
+      // console.log(loggedInUser,logInUser);
+      
+      
       if (!likedUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1947,7 +1954,7 @@ app.post(
           .status(400)
           .json({ message: "You have already liked this profile" });
       }
-
+      const message=logInUser.username+'liked your profile!';
       // Increment the likes count of the likedUser and add the logged-in user's ID to the likedBy array
       likedUser.likes += 1;
       likedUser.likedBy.push(loggedInUser);
@@ -1956,6 +1963,8 @@ app.post(
       await likedUser.save();
 
       // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
+     
+      sendPushNotification(likedUser.fcmToken,message)
 
       return res.status(200).json({ user: likedUser });
     } catch (error) {
@@ -2024,6 +2033,7 @@ app.post("/loadcustom", authenticateToken, async (e, o) => {
       if (a === "friendRequest") {
         console.log("fr");
         // Check if recipient is already a friend
+        const senderUser = await User.findOne({ email: s });
         const recipientUser = await User.findOne({ email: r });
 
         if (
@@ -2060,6 +2070,8 @@ app.post("/loadcustom", authenticateToken, async (e, o) => {
           });
 
           await notification.save();
+          const message = senderUser.username + 'sent you a friend request!'
+          sendPushNotification(recipientUser.fcmToken,message)
           res.status(201).json({ message: "Notification created" });
           // console.log("Notification created");
         }
@@ -2091,6 +2103,8 @@ app.post("/loadcustom", authenticateToken, async (e, o) => {
           pic: senderUser.pic, // Use sender's picture
         });
         await notification.save();
+        const message = senderUser.username + 'has sent you a GIFT!'
+        sendPushNotification(recipientUser.fcmToken,message)
         res.status(201).json({ message: "Notification created" });
         // console.log("Notification created");
       }
