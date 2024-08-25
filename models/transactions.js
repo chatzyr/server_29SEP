@@ -5,7 +5,10 @@ const badgeSchema1 = new mongoose.Schema({
     transaction_id: { type: String, required: true,unique: true },
     amount: { type: String, required: true },
     time: { type: String, required: true },
-    status: {type:String, default:'verified'}
+    status: {type:String, default:'pending'},
+    payproID: {type:String}
+    
+
     
 });
 
