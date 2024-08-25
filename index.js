@@ -405,6 +405,10 @@ const updateTransactions = async (ids, email) => {
 
   ids.forEach(async (element) => {
     // console.log(element);
+    if(!element.payproID)
+    {
+      return 0;
+    }
     const params = {
       Username: "CHATZYR",
       Cpayid: element.payproID,
@@ -419,7 +423,11 @@ const updateTransactions = async (ids, email) => {
         },
         params: params, // Send params as query parameters
       });
-      if (response.data.OrderStatus == "paid") {
+      // console.log("here" + response.data[1].OrderStatus);
+      
+      if (response.data[1].OrderStatus == "PAID") {
+        console.log("its paid ");
+        
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
@@ -429,9 +437,7 @@ const updateTransactions = async (ids, email) => {
             throw new Error("User not found");
           }
 
-          console.log(user.balance);
-          console.log(response.data[1].OrderAmountPaid);
-          console.log(typeof response.data[1].OrderAmountPaid);
+
           user.balance =
             (user.balance || 0) + parseInt(response.data[1].OrderAmountPaid);
           await user.save({ session });
@@ -464,7 +470,7 @@ const updateTransactions = async (ids, email) => {
         }
       }
 
-      console.log(response.data); // Log the response data
+      // console.log(response.data); // Log the response data
     } catch (error) {
       console.error(
         "Error:",
@@ -1755,8 +1761,38 @@ app.get("/api/payment-details", authenticateToken, async (req, res) => {
   }
 });
 
+// app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
+//   console.log("req");
+//   try {
+//     const email = req.params.email;
+
+//     const ids = await TransactionModel.find({
+//       email: email,
+//       status: "pending",
+//     });
+//     // console.log(ids);
+
+//     await updateTransactions(ids, email);
+//     // Find all transactions with the given email and status "done"
+
+//     const transactions = await TransactionModel.find({ email });
+
+//     if (transactions.length === 0) {
+//       return res.status(404).json({
+//         message:
+//           'No transactions found with status "done" for the specified email.',
+//       });
+//     }
+
+//     res.status(200).json(transactions);
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
 app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
-  console.log("req");
+  // console.log("req");
   try {
     const email = req.params.email;
 
@@ -1765,7 +1801,6 @@ app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
       status: "pending",
     });
     // console.log(ids);
-
     await updateTransactions(ids, email);
     // Find all transactions with the given email and status "done"
 
@@ -1780,11 +1815,10 @@ app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
 
     res.status(200).json(transactions);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Internal server error" });
-  }
+    console.error("Error on Line 1789" + error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
-
 function authenticateToken(req, res, next) {
   const token = req.headers["authorization"];
   // console.log("SERVER HD "+JSON.stringify(req.headers));
