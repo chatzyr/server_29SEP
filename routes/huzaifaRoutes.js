@@ -258,6 +258,8 @@ router.post('/save-fcm-token', async (req, res) => {
   try {
     
       const { email, fcmToken } = req.body;
+      console.log(req.body);
+      
       console.log('save fcm',req.body);
       
 

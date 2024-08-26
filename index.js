@@ -43,7 +43,7 @@ var nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
 var admin = require("firebase-admin");
 
-var serviceAccount = require("./chatzyr-15d55-firebase-adminsdk-rlnk4-15bdb6d62a.json");
+var serviceAccount = require("./chatzyr-15d55-firebase-adminsdk-rlnk4-b40e0060f5.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -2357,7 +2357,7 @@ app.post("/blockuser", authenticateToken, async (req, res) => {
 });
 
 app.post("/createroom", authenticateToken, async (req, res) => {
-  const { usern, name, pic, bio, videoUrl, roomOwner, roomPrivacy, roomPass } =
+  const { usern, name, pic, bio, videoUrl, roomOwner, roomPrivacy, roomPass,bubble } =
     req.body.roombody;
   var mylink = getlink(videoUrl);
   if (mylink == null || mylink == "") {
@@ -2386,6 +2386,7 @@ app.post("/createroom", authenticateToken, async (req, res) => {
       roomOwner: roomOwner,
       public: roomPrivacy,
       password: roomPass,
+      bubble,bubble,
     };
     const newRoom = await RoomModel(roomData);
     await newRoom.save({ session });
