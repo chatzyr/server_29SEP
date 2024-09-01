@@ -2493,8 +2493,9 @@ app.post("/createroom", authenticateToken, async (req, res) => {
           name: a,
           bio: n,
           videoUrl: i,
+          bubble:b,
         } = e.body.roombody;
-        // console.log('video: ',i);
+        console.log(e.body.roombody);
         var mylink = i;
 
         if (!i.includes("backblaze")) {
@@ -2516,6 +2517,7 @@ app.post("/createroom", authenticateToken, async (req, res) => {
           a && (c.name = a),
           n && (c.bio = n),
           i && (c.videourl = mylink),
+          typeof b !== 'undefined' &&(c.bubble = b),
           !(await RoomModel.findOneAndUpdate(
             { roomId: r },
             { $set: c },
