@@ -1840,7 +1840,7 @@ function authenticateToken(req, res, next) {
 app.get("/fetchver", authenticateToken, async (e, o) => {
   console.log("HERE");
   try {
-    t = { version: "1.0.0", link: "https://www.chatzyr.net/" };
+    t = { version: "2.0.0", link: "https://play.google.com/store/apps/details?id=com.spotflux90.chatzyeAppUpdate" };
     o.json(t);
   } catch (e) {
     console.error("Error:", e),
