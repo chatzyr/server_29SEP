@@ -2357,15 +2357,34 @@ app.post("/blockuser", authenticateToken, async (req, res) => {
 });
 
 app.post("/createroom", authenticateToken, async (req, res) => {
-  const { usern, name, pic, bio, videoUrl, roomOwner, roomPrivacy, roomPass,bubble } =
-    req.body.roombody;
-  var mylink = getlink(videoUrl);
-  if (mylink == null || mylink == "") {
-    mylink = "";
-  } else {
-    if (!mylink.includes("backblaze")) {
-      mylink = "https://www.youtube.com/embed/" + mylink;
+  const {
+    usern,
+    name,
+    pic,
+    bio,
+    videoUrl,
+    roomOwner,
+    roomPrivacy,
+    roomPass,
+    bubble,
+  } = req.body.roombody;
+
+  let videoUrlx = [];
+  for (let i = 0; i < videoUrl.length; i++) {
+    if (videoUrl[i].includes("embed")) {
+      videoUrlx.push(videoUrl[i]);
+      continue;
     }
+
+    var mylink = getlink(videoUrl[i]);
+    if (mylink == null || mylink == "") {
+      mylink = "";
+    } else {
+      if (!mylink.includes("backblaze")) {
+        mylink = "https://www.youtube.com/embed/" + mylink;
+      }
+    }
+    videoUrlx.push(mylink);
   }
 
   try {
@@ -2380,13 +2399,14 @@ app.post("/createroom", authenticateToken, async (req, res) => {
       name: name,
       coordinates: coordinates,
       badgeurl: pic,
-      videourl: mylink,
+      videourl: videoUrlx,
       bio: bio,
       mods: [usern], // Assuming room owner is also a moderator
       roomOwner: roomOwner,
       public: roomPrivacy,
       password: roomPass,
-      bubble,bubble,
+      bubble,
+      bubble,
     };
     const newRoom = await RoomModel(roomData);
     await newRoom.save({ session });
@@ -2493,31 +2513,37 @@ app.post("/createroom", authenticateToken, async (req, res) => {
           name: a,
           bio: n,
           videoUrl: i,
-          bubble:b,
+          bubble: b,
         } = e.body.roombody;
         console.log(e.body.roombody);
-        var mylink = i;
+        videoUrls = [];
+        for (let ix = 0; ix < i.length; ix++) {
+          var mylink = i[ix];
 
-        if (!i.includes("backblaze")) {
-          if (!i.includes("embed")) {
-            if (mylink == null || mylink == "" || mylink.length <= 6) {
-              mylink = "";
-            } else {
-              mylink = getlink(i);
+          if (!i[ix].includes("backblaze")) {
+            if (!i[ix].includes("embed")) {
+              if (mylink == null || mylink == "" || mylink.length <= 6) {
+                mylink = "";
+              } else {
+                mylink = getlink(i[ix]);
+                console.log('myl: ', mylink);
+                
 
-              mylink = "https://www.youtube.com/embed/" + mylink;
+                mylink = "https://www.youtube.com/embed/" + mylink;
+              }
             }
           }
+          videoUrls.push(mylink);
         }
-        // console.log('egge '+ mylink);
+        console.log('egge '+ mylink);
 
         c = {};
         if (
           (t && (c.badgeurl = t),
           a && (c.name = a),
           n && (c.bio = n),
-          i && (c.videourl = mylink),
-          typeof b !== 'undefined' &&(c.bubble = b),
+          i && (c.videourl = videoUrls),
+          typeof b !== "undefined" && (c.bubble = b),
           !(await RoomModel.findOneAndUpdate(
             { roomId: r },
             { $set: c },
@@ -2526,11 +2552,11 @@ app.post("/createroom", authenticateToken, async (req, res) => {
         )
           throw new Error("Room not found");
 
-        // console.log("Updated Room Data");
+        console.log("Updated Room Data");
         o.json({ stat: 200 });
       });
     } catch (e) {
-      // console.log("Room Update Failed: " + e);
+      console.log("Room Update Failed: " + e);
     } finally {
       s.endSession();
     }
