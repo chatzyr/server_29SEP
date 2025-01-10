@@ -103,7 +103,7 @@ const createToken = (userId) => {
   };
 
   // Generate the token with a secret key and expiration time
-  const token = jwt.sign(payload, "Q$r2K6W8n!jCW%Zk", { expiresIn: "7d" });
+  const token = jwt.sign(payload, "Q$r2K6W8n!jCW%Zk", { expiresIn: "30d" });
 
   return token;
 };
