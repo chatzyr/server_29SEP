@@ -19,7 +19,7 @@ const roomSchema = new mongoose.Schema({
     default:
       "https://icons.veryicon.com/png/o/media/home-furnishing-icon/room-1.png",
   },
-  videourl: { type: [String],  default: ["https://example.com/default-video.mp4"] },
+  videourl: { type: [String],  default: ["https://www.youtube.com/embed/BhUthi9HGjg?si=zufizUpqsTCinhpY"] },
   bio: { type: String, default: "" },
   likes: { type: Number, default: 0 },
   likedBy: [{ type: String, default: "" }],

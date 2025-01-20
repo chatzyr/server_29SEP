@@ -2370,6 +2370,7 @@ app.post("/createroom", authenticateToken, async (req, res) => {
   } = req.body.roombody;
 
   let videoUrlx = [];
+  if (videoUrl && videoUrl.length > 0) {
   for (let i = 0; i < videoUrl.length; i++) {
     if (videoUrl[i].includes("embed")) {
       videoUrlx.push(videoUrl[i]);
@@ -2385,6 +2386,10 @@ app.post("/createroom", authenticateToken, async (req, res) => {
       }
     }
     videoUrlx.push(mylink);
+  }
+}
+  else{
+    videoUrlx = ["https://www.youtube.com/embed/BhUthi9HGjg?si=zufizUpqsTCinhpY"];
   }
 
   try {
