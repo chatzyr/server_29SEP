@@ -44,6 +44,7 @@ const bcrypt = require("bcrypt");
 var admin = require("firebase-admin");
 
 var serviceAccount = require("./chatzyr-15d55-firebase-adminsdk-rlnk4-b40e0060f5.json");
+const { log } = require("console");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -405,8 +406,7 @@ const updateTransactions = async (ids, email) => {
 
   ids.forEach(async (element) => {
     // console.log(element);
-    if(!element.payproID)
-    {
+    if (!element.payproID) {
       return 0;
     }
     const params = {
@@ -424,10 +424,10 @@ const updateTransactions = async (ids, email) => {
         params: params, // Send params as query parameters
       });
       // console.log("here" + response.data[1].OrderStatus);
-      
+
       if (response.data[1].OrderStatus == "PAID") {
         console.log("its paid ");
-        
+
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
@@ -436,7 +436,6 @@ const updateTransactions = async (ids, email) => {
           if (!user) {
             throw new Error("User not found");
           }
-
 
           user.balance =
             (user.balance || 0) + parseInt(response.data[1].OrderAmountPaid);
@@ -533,6 +532,8 @@ mongoose.connect(mongoUrl, { useNewUrlParser: !0, useUnifiedTopology: !0 }),
 const wss = new WebSocket.Server({ server: server }),
   roomDataMap = new Map();
 const clientsMap = new Map();
+// console.log(clientsMap,roomDataMap);
+
 async function fetchAndSendUpdates(roomId, x) {
   try {
     const roomData = await getfromdb(roomId, x);
@@ -915,7 +916,9 @@ setInterval(() => {
 }, 15000); // Check for inactivity every second
 
 const userConnections = new Map();
+const roomActiveUsers = new Map();
 
+const roomUsers = new Map(); // To track which users are in which room
 wss.on("connection", (e) => {
   connections.add(e),
     console.log("WebSocket client connected"),
@@ -925,6 +928,7 @@ wss.on("connection", (e) => {
         if (s.action == "ping") {
           // console.log("PING");
           // Received a "ping" message from the client, respond with a "pong"
+          const { roomId } = s;
           const t = { msg: "pong" };
           e.send(JSON.stringify(t));
         } else if (s.action === "getFriends") {
@@ -976,7 +980,7 @@ wss.on("connection", (e) => {
           // Handle the 'getNotifications' action here
           const { recipientEmail } = s.data;
           // console.log(s);
-          
+
           // console.log("ALIVE REQ "+ recipientEmail);
           activeUsers.set(recipientEmail, {
             connection: e,
@@ -992,8 +996,44 @@ wss.on("connection", (e) => {
             e.send(JSON.stringify({ notifications }));
             const onlineusers = Array.from(activeUsers.keys());
             // console.log(onlineusers);
+            const onlineusersDetails = {};
 
-            e.send(JSON.stringify({ onlineusers }));
+            for (const userEmailObj of onlineusers) {
+              let userEmail;
+            
+              // Check if the item is a JSON string or a plain string
+              try {
+                // Try to parse as JSON
+                userEmail = JSON.parse(userEmailObj).email;
+              } catch (error) {
+                // If parsing fails, assume it's a plain email string
+                userEmail = userEmailObj;
+              }
+            
+              // Fetch user details from the database
+              const userFromDB = await User.findOne({ email: userEmail });
+            
+              if (userFromDB) {
+                onlineusersDetails[userEmail] = {
+                  backgroundPic: userFromDB.backgroundPic,
+                  badge: userFromDB.badge,
+                  bio: userFromDB.bio,
+                  chatcolor: userFromDB.chatcolor || "#FFFFFF",
+                  email: userFromDB.email,
+                  friends: userFromDB.friends,
+                  likes: userFromDB.likes,
+                  name: userFromDB.username,
+                  password: userFromDB.password,
+                  pic: userFromDB.pic,
+                  premium: userFromDB.premium || false,
+                  usernamecolor: userFromDB.usernamecolor || "#FF0000",
+                };
+              }
+            }
+            // log
+            e.send(JSON.stringify({ onlineusers: onlineusersDetails }));
+
+            // e.send(JSON.stringify({ onlineusers }));
           } catch (error) {
             console.error("Error fetching notifications:", error);
           }
@@ -1127,21 +1167,74 @@ wss.on("connection", (e) => {
         //     roomDataMap.get(roomId).push(e);
 
         // }
+        // else if ("roomId" in s) {
+        //   const roomId = s.roomId;
+
+        //   roomMutex
+        //     .runExclusive(async () => {
+        //       if (!roomDataMap.has(roomId)) {
+        //         // console.log("ROOM NF " + roomId);
+        //         roomDataMap.set(roomId, []);
+        //         roomids.push(roomId);
+        //       }
+
+        //       // console.log("ADDED To " + roomId);
+        //       roomDataMap.get(roomId).push(e);
+
+        //       roomids.push(roomId);
+        //     })
+        //     .then(() => {
+        //       const uniqueRoomIds = new Set(roomids);
+        //       const idx = Array.from(uniqueRoomIds);
+        //       roomids.length = 0;
+        //       roomids = [];
+
+        //       idx.forEach((roome) => {
+        //         fetchAndSendUpdates(roome);
+        //       });
+        //       // console.log("SENT UPDATES!!");
+        //     });
+        // }
         else if ("roomId" in s) {
           const roomId = s.roomId;
+          const userId = s.userid; // Make sure client sends this
 
           roomMutex
             .runExclusive(async () => {
+              // Add to room connections as before
               if (!roomDataMap.has(roomId)) {
-                // console.log("ROOM NF " + roomId);
                 roomDataMap.set(roomId, []);
                 roomids.push(roomId);
               }
-
-              // console.log("ADDED To " + roomId);
               roomDataMap.get(roomId).push(e);
-
               roomids.push(roomId);
+
+              // Add to active users tracking
+              if (!roomActiveUsers.has(roomId)) {
+                roomActiveUsers.set(roomId, new Map());
+              }
+
+              // Get user details from database
+              const user = await User.findOne({ email: userId });
+              if (user) {
+                roomActiveUsers.get(roomId).set(userId, {
+                  email: user.email,
+                  backgroundPic: user.backgroundPic || "default_background_url",
+                  badge: user.badge,
+                  bio: user.bio,
+                  chatcolor: user.chatcolor,
+                  friends: user.friends,
+                  likes: user.likes,
+                  name: user.username,
+                  pic: user.pic,
+                  premium: user.premium,
+                  usernamecolor: user.usernamecolor,
+                  connection: e,
+                });
+
+                // Broadcast updated active users list to all clients in the room
+                // broadcastActiveUsers(roomId);
+              }
             })
             .then(() => {
               const uniqueRoomIds = new Set(roomids);
@@ -1152,9 +1245,34 @@ wss.on("connection", (e) => {
               idx.forEach((roome) => {
                 fetchAndSendUpdates(roome);
               });
-              // console.log("SENT UPDATES!!");
             });
-        } else if ("room_id" in s) {
+        }
+
+        // Add handler for requesting active users
+        // else if (s.action === "getActiveUsers") {
+        //   console.log("Received request for active users");
+        //   const { roomId } = s;
+        //   if (roomActiveUsers.has(roomId)) {
+        //     const users = Array.from(roomActiveUsers.get(roomId).values()).map(user => ({
+        //       email: user.email,
+        //       backgroundPic: user.backgroundPic,
+        //       badge: user.badge,
+        //       bio: user.bio,
+        //       chatcolor: user.chatcolor,
+        //       friends: user.friends,
+        //       likes: user.likes,
+        //       name: user.name,
+        //       pic: user.pic,
+        //       premium: user.premium,
+        //       usernamecolor: user.usernamecolor
+        //     }));
+        //     e.send(JSON.stringify({
+        //       type: 'active_users',
+        //       users: users
+        //     }));
+        //   }
+        // }
+        else if ("room_id" in s) {
           addservermessage(s.mymessage, s.room_id);
         }
       } catch (e) {
@@ -1816,8 +1934,8 @@ app.get("/find-transactions/:email", authenticateToken, async (req, res) => {
     res.status(200).json(transactions);
   } catch (error) {
     console.error("Error on Line 1789" + error);
-    res.status(500).json({ message: "Internal server error" });
-  }
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 function authenticateToken(req, res, next) {
   const token = req.headers["authorization"];
@@ -1840,7 +1958,10 @@ function authenticateToken(req, res, next) {
 app.get("/fetchver", authenticateToken, async (e, o) => {
   console.log("HERE");
   try {
-    t = { version: "2.0.0", link: "https://play.google.com/store/apps/details?id=com.spotflux90.chatzyeAppUpdate" };
+    t = {
+      version: "2.0.0",
+      link: "https://play.google.com/store/apps/details?id=com.spotflux90.chatzyeAppUpdate",
+    };
     o.json(t);
   } catch (e) {
     console.error("Error:", e),
@@ -1976,8 +2097,7 @@ app.post(
       const logInUser = await User.findOne({ email: loggedInUser });
       // console.log(likedUser.fcmToken);
       // console.log(loggedInUser,logInUser);
-      
-      
+
       if (!likedUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1988,7 +2108,7 @@ app.post(
           .status(400)
           .json({ message: "You have already liked this profile" });
       }
-      const message=logInUser.username+'liked your profile!';
+      const message = logInUser.username + "liked your profile!";
       // Increment the likes count of the likedUser and add the logged-in user's ID to the likedBy array
       likedUser.likes += 1;
       likedUser.likedBy.push(loggedInUser);
@@ -1997,8 +2117,8 @@ app.post(
       await likedUser.save();
 
       // for (const e of roomDataMap.keys()) fetchAndSendUpdates(e);
-     
-      sendPushNotification(likedUser.fcmToken,message)
+
+      sendPushNotification(likedUser.fcmToken, message);
 
       return res.status(200).json({ user: likedUser });
     } catch (error) {
@@ -2104,8 +2224,8 @@ app.post("/loadcustom", authenticateToken, async (e, o) => {
           });
 
           await notification.save();
-          const message = senderUser.username + 'sent you a friend request!'
-          sendPushNotification(recipientUser.fcmToken,message)
+          const message = senderUser.username + "sent you a friend request!";
+          sendPushNotification(recipientUser.fcmToken, message);
           res.status(201).json({ message: "Notification created" });
           // console.log("Notification created");
         }
@@ -2137,8 +2257,8 @@ app.post("/loadcustom", authenticateToken, async (e, o) => {
           pic: senderUser.pic, // Use sender's picture
         });
         await notification.save();
-        const message = senderUser.username + 'has sent you a GIFT!'
-        sendPushNotification(recipientUser.fcmToken,message)
+        const message = senderUser.username + "has sent you a GIFT!";
+        sendPushNotification(recipientUser.fcmToken, message);
         res.status(201).json({ message: "Notification created" });
         // console.log("Notification created");
       }
@@ -2371,25 +2491,26 @@ app.post("/createroom", authenticateToken, async (req, res) => {
 
   let videoUrlx = [];
   if (videoUrl && videoUrl.length > 0) {
-  for (let i = 0; i < videoUrl.length; i++) {
-    if (videoUrl[i].includes("embed")) {
-      videoUrlx.push(videoUrl[i]);
-      continue;
-    }
-
-    var mylink = getlink(videoUrl[i]);
-    if (mylink == null || mylink == "") {
-      mylink = "";
-    } else {
-      if (!mylink.includes("backblaze")) {
-        mylink = "https://www.youtube.com/embed/" + mylink;
+    for (let i = 0; i < videoUrl.length; i++) {
+      if (videoUrl[i].includes("embed")) {
+        videoUrlx.push(videoUrl[i]);
+        continue;
       }
+
+      var mylink = getlink(videoUrl[i]);
+      if (mylink == null || mylink == "") {
+        mylink = "";
+      } else {
+        if (!mylink.includes("backblaze")) {
+          mylink = "https://www.youtube.com/embed/" + mylink;
+        }
+      }
+      videoUrlx.push(mylink);
     }
-    videoUrlx.push(mylink);
-  }
-}
-  else{
-    videoUrlx = ["https://www.youtube.com/embed/BhUthi9HGjg?si=zufizUpqsTCinhpY"];
+  } else {
+    videoUrlx = [
+      "https://www.youtube.com/embed/BhUthi9HGjg?si=zufizUpqsTCinhpY",
+    ];
   }
 
   try {
@@ -2531,8 +2652,7 @@ app.post("/createroom", authenticateToken, async (req, res) => {
                 mylink = "";
               } else {
                 mylink = getlink(i[ix]);
-                console.log('myl: ', mylink);
-                
+                console.log("myl: ", mylink);
 
                 mylink = "https://www.youtube.com/embed/" + mylink;
               }
@@ -2540,7 +2660,7 @@ app.post("/createroom", authenticateToken, async (req, res) => {
           }
           videoUrls.push(mylink);
         }
-        console.log('egge '+ mylink);
+        console.log("egge " + mylink);
 
         c = {};
         if (
