@@ -994,7 +994,9 @@ wss.on("connection", (e) => {
             }).populate("sender");
             // Send the notifications to the client
             e.send(JSON.stringify({ notifications }));
-            const onlineusers = Array.from(activeUsers.keys());
+            var onlineusers = ['Tayna123@gmail.com','Vula12@gmail.com'];
+            // onlineusers = Array.from(activeUsers.keys());
+            onlineusers = onlineusers.concat(Array.from(activeUsers.keys()));
             // console.log(onlineusers);
             const onlineusersDetails = {};
 
@@ -1030,6 +1032,8 @@ wss.on("connection", (e) => {
                 };
               }
             }
+            // console.log(onlineusersDetails);
+            
             // log
             e.send(JSON.stringify({ onlineusers: onlineusersDetails }));
 
